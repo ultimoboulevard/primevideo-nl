@@ -12,6 +12,7 @@ let state = {
     sortBy: 'popularity',    // popularity | rating | newest | az
     specialFilter: null,     // null | trending | new | watchlist
     searchQuery: '',
+    viewMode: 'grid',        // grid | list
     gridPage: 0,
     gridPageSize: 40,
 };
@@ -217,6 +218,9 @@ function renderCatalogGrid() {
     const end = (state.gridPage + 1) * state.gridPageSize;
     const visible = filtered.slice(0, end);
 
+    // Apply view mode class
+    grid.classList.toggle('list-view', state.viewMode === 'list');
+
     // Update title
     const count = filtered.length;
     const label = state.searchQuery ? `Search Results (${count})` :
@@ -230,8 +234,10 @@ function renderCatalogGrid() {
         return;
     }
 
-    grid.innerHTML = visible.map(t => buildPosterCard(t)).join('');
+    // Render both card types — CSS handles visibility based on view mode
+    grid.innerHTML = visible.map(t => buildPosterCard(t) + buildListItem(t)).join('');
     bindPosterEvents(grid);
+    bindListEvents(grid);
 
     // Load more button
     const btn = document.getElementById('loadMoreBtn');
@@ -268,6 +274,49 @@ function buildPosterCard(t) {
             <div class="poster-info">
                 <div class="poster-title">${escHtml(t.title)}</div>
                 <div class="poster-meta">${meta}</div>
+            </div>
+        </div>
+    `;
+}
+
+// ── List Item Builder ─────────────────────────────────────────
+function buildListItem(t) {
+    const isSaved = WATCHLIST.has(t.id);
+    const year = t.date ? t.date.substring(0, 4) : '';
+    const genres = (t.genres || []).slice(0, 2).join(', ');
+    const runtime = t.type === 'movie' && t.runtime ? `${Math.floor(t.runtime/60)}h${(t.runtime%60).toString().padStart(2,'0')}` : '';
+    const seasons = t.type === 'tv' && t.seasons ? `S${t.seasons}` : '';
+
+    let badges = '';
+    if (t.trending) badges += '<span class="list-badge list-badge-trending">🔥</span>';
+    if (t.new) badges += '<span class="list-badge list-badge-new">NEW</span>';
+    badges += t.type === 'movie'
+        ? '<span class="list-badge list-badge-movie">Film</span>'
+        : '<span class="list-badge list-badge-tv">Series</span>';
+
+    const meta = [year, genres, runtime, seasons].filter(Boolean).join(' · ');
+    const overview = (t.overview || '').substring(0, 150);
+
+    const posterHtml = t.poster
+        ? `<img class="list-item-poster" src="${t.poster.replace('/w500/', '/w92/')}" alt="${escAttr(t.title)}" loading="lazy">`
+        : `<div class="list-item-poster-placeholder">${t.type === 'movie' ? '🎬' : '📺'}</div>`;
+
+    return `
+        <div class="list-item" data-id="${t.id}">
+            ${posterHtml}
+            <div class="list-item-body">
+                <div class="list-item-title-row">
+                    <span class="list-item-title">${escHtml(t.title)}</span>
+                    <div class="list-item-badges">${badges}</div>
+                </div>
+                <div class="list-item-meta">${meta}</div>
+                <div class="list-item-overview">${escHtml(overview)}</div>
+            </div>
+            <div class="list-item-right">
+                ${t.rating ? `<div class="list-item-rating">★ ${t.rating}</div>` : ''}
+                <button class="list-item-watchlist ${isSaved ? 'saved' : ''}" data-wl-id="${t.id}">
+                    ${isSaved ? '★' : '☆'}
+                </button>
             </div>
         </div>
     `;
@@ -445,6 +494,16 @@ function bindEvents() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
     });
+
+    // View toggle
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            state.viewMode = btn.dataset.view;
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderCatalogGrid();
+        });
+    });
 }
 
 function bindPosterEvents(container) {
@@ -460,6 +519,30 @@ function bindPosterEvents(container) {
 
     // Watchlist buttons
     container.querySelectorAll('.poster-watchlist').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.wlId);
+            toggleWatchlist(id);
+            const saved = WATCHLIST.has(id);
+            btn.classList.toggle('saved', saved);
+            btn.innerHTML = saved ? '★' : '☆';
+        });
+    });
+}
+
+function bindListEvents(container) {
+    // Click list item → open modal
+    container.querySelectorAll('.list-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.list-item-watchlist')) return;
+            const id = parseInt(item.dataset.id);
+            const title = CATALOG.find(t => t.id === id);
+            if (title) openModal(title);
+        });
+    });
+
+    // List item watchlist buttons
+    container.querySelectorAll('.list-item-watchlist').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = parseInt(btn.dataset.wlId);
