@@ -1,0 +1,61 @@
+name: Prime Video NL Pipeline
+
+on:
+  schedule:
+    # Every day at 05:00 UTC = 07:00 CEST (Amsterdam summer)
+    - cron: '0 5 * * *'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Collect from TMDB
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: python main.py collect
+
+      - name: Export JSON for site
+        run: python main.py export
+
+      - name: Check day of week
+        id: dow
+        run: echo "day=$(date +%u)" >> $GITHUB_OUTPUT
+
+      - name: Send email digest (Monday only)
+        if: steps.dow.outputs.day == '1' || github.event_name == 'workflow_dispatch'
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python main.py digest
+
+      - name: Persist DB
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "Auto-update DB: $(date +%F)"
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site

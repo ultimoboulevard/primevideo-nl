@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prime Video NL — What's New</title>
+    <meta name="description" content="Browse the full Amazon Prime Video Netherlands catalog. Discover new movies, trending series, and hidden gems updated daily.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="header-inner">
+            <h1 class="logo">🎬 Prime Video NL</h1>
+            <div class="header-actions">
+                <div class="search-box">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input type="text" id="searchInput" placeholder="Search titles, actors, directors…" autocomplete="off">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Filters -->
+    <nav class="filters" id="filters">
+        <div class="filters-inner">
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all" id="filterAll">All</button>
+                <button class="filter-btn" data-filter="movie" id="filterMovies">🎬 Movies</button>
+                <button class="filter-btn" data-filter="tv" id="filterTV">📺 TV Shows</button>
+            </div>
+            <div class="filter-group">
+                <div class="dropdown" id="genreDropdown">
+                    <button class="dropdown-btn" id="genreBtn">Genre ▾</button>
+                    <div class="dropdown-menu" id="genreMenu"></div>
+                </div>
+                <div class="dropdown" id="sortDropdown">
+                    <button class="dropdown-btn" id="sortBtn">Sort: Popular ▾</button>
+                    <div class="dropdown-menu" id="sortMenu">
+                        <button class="dropdown-item active" data-sort="popularity">Popular</button>
+                        <button class="dropdown-item" data-sort="rating">Top Rated</button>
+                        <button class="dropdown-item" data-sort="newest">Newest</button>
+                        <button class="dropdown-item" data-sort="az">A → Z</button>
+                    </div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <button class="filter-btn" id="filterTrending" data-filter="trending">🔥 Trending</button>
+                <button class="filter-btn" id="filterNew" data-filter="new">🆕 New</button>
+                <button class="filter-btn" id="filterWatchlist" data-filter="watchlist">⭐ Watchlist</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+        <div class="stats-inner">
+            <span class="stat" id="statTotal"></span>
+            <span class="stat" id="statMovies"></span>
+            <span class="stat" id="statShows"></span>
+            <span class="stat" id="statTrending"></span>
+            <span class="stat" id="statNew"></span>
+        </div>
+    </div>
+
+    <!-- Hero Carousel (Trending) -->
+    <section class="hero-section" id="heroSection">
+        <div class="hero-carousel" id="heroCarousel"></div>
+        <div class="hero-dots" id="heroDots"></div>
+    </section>
+
+    <!-- Trending Row -->
+    <section class="section" id="trendingSection">
+        <h2 class="section-title">🔥 Trending Now</h2>
+        <div class="scroll-row" id="trendingRow"></div>
+    </section>
+
+    <!-- New This Week -->
+    <section class="section" id="newSection">
+        <h2 class="section-title">🆕 New This Week</h2>
+        <div class="scroll-row" id="newRow"></div>
+    </section>
+
+    <!-- Full Catalog Grid -->
+    <section class="section" id="catalogSection">
+        <h2 class="section-title" id="catalogTitle">Full Catalog</h2>
+        <div class="poster-grid" id="catalogGrid"></div>
+        <div class="load-more-wrap">
+            <button class="load-more-btn" id="loadMoreBtn">Load More</button>
+        </div>
+    </section>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <button class="modal-close" id="modalClose">✕</button>
+            <div class="modal-backdrop" id="modalBackdrop"></div>
+            <div class="modal-content" id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> · Updated daily · Prime Video NL</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
