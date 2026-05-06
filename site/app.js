@@ -209,10 +209,15 @@ function renderCuratedSections() {
     const taste = TasteEngine.getTasteVector();
     const hasTaste = taste.totalRatings > 0;
 
+    // Track used IDs to avoid duplicates across curated rows
+    const usedIds = new Set();
+
     // ── Row 1: Top Picks For You ───────────────────────────────
     const topPicks = [...CATALOG]
         .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
+        .filter(t => { if (usedIds.has(t.id)) return false; return true; })
         .slice(0, 24);
+    topPicks.forEach(t => usedIds.add(t.id));
     const topPicksRow = document.getElementById('topPicksRow');
     topPicksRow.innerHTML = topPicks.map(t => buildPosterCard(t)).join('');
     bindPosterEvents(topPicksRow);
@@ -240,16 +245,20 @@ function renderCuratedSections() {
         const gf = genre.toLowerCase();
         const becauseItems = [...CATALOG]
             .filter(t => (t.genres || []).some(g => g.toLowerCase().includes(gf)))
+            .filter(t => !usedIds.has(t.id))
             .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
             .slice(0, 24);
+        becauseItems.forEach(t => usedIds.add(t.id));
         becauseRow.innerHTML = becauseItems.map(t => buildPosterCard(t)).join('');
         bindPosterEvents(becauseRow);
     } else {
         document.getElementById('becauseTitle').textContent = '🎥 Critics\u2019 Favourites';
         document.getElementById('becauseSubtitle').textContent = 'Acclaimed films on Prime Video NL';
         const criticsItems = [...CATALOG]
+            .filter(t => !usedIds.has(t.id))
             .sort((a, b) => (b.interest_score || 0) - (a.interest_score || 0))
             .slice(0, 24);
+        criticsItems.forEach(t => usedIds.add(t.id));
         becauseRow.innerHTML = criticsItems.map(t => buildPosterCard(t)).join('');
         bindPosterEvents(becauseRow);
     }
@@ -258,6 +267,7 @@ function renderCuratedSections() {
     // ── Row 3: Hidden Gems ───────────────────────────────────
     const gems = [...CATALOG]
         .filter(t => (t.interest_score || 0) >= 55 && (t.popularity || 0) < 40)
+        .filter(t => !usedIds.has(t.id))
         .sort((a, b) => (b.interest_score || 0) - (a.interest_score || 0))
         .slice(0, 24);
     const gemsRow = document.getElementById('hiddenGemsRow');
