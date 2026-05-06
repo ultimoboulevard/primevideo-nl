@@ -27,10 +27,43 @@ document.addEventListener('DOMContentLoaded', () => {
             renderStats(data.stats);
             buildGenreMenu();
             renderHero();
-            renderTrendingRow();
-            renderNewRow();
+            renderCuratedSections();
             renderCatalogGrid();
             bindEvents();
+            // ── Taste Engine init ──────────────────
+            fetch('data/my_taste.json')
+                .then(r => {
+                    if (r.ok) return r.json();
+                    throw new Error('No bootstrap');
+                })
+                .then(bootstrap => {
+                    const local = TasteEngine.getTasteVector();
+                    const bootstrapRatings = bootstrap.totalRatings || 0;
+                    // Always prefer the richer profile source
+                    if (bootstrapRatings > (local.totalRatings || 0)) {
+                        TasteEngine.injectTaste(bootstrap);
+                        console.log(`Taste profile bootstrapped from Excel history (${bootstrapRatings} titles vs ${local.totalRatings || 0} local)`);
+                    }
+                    // Activate taste sort if we have any taste data
+                    if (TasteEngine.getTasteVector().totalRatings > 0) {
+                        state.sortBy = 'foryou';
+                        document.getElementById('sortBtn').textContent = `Sort: ✨ For You ▾`;
+                        document.querySelectorAll('#sortMenu .dropdown-item').forEach(b => {
+                            b.classList.toggle('active', b.dataset.sort === 'foryou');
+                        });
+                        // Re-render sections with taste data
+                        renderHero();
+                        renderCuratedSections();
+                        renderCatalogGrid();
+                        renderStats(null); // refresh taste-aware stats
+                    }
+                    updateTasteIndicator();
+                    OnboardingQuiz.scheduleShow();
+                })
+                .catch(() => {
+                    updateTasteIndicator();
+                    OnboardingQuiz.scheduleShow();
+                });
         })
         .catch(err => {
             console.error('Failed to load catalog:', err);
@@ -41,12 +74,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Stats ─────────────────────────────────────────────────────
 function renderStats(stats) {
-    if (!stats) return;
-    document.getElementById('statTotal').innerHTML = `<strong>${stats.total}</strong> titles`;
-    document.getElementById('statMovies').innerHTML = `<strong>${stats.movies}</strong> movies`;
-    document.getElementById('statShows').innerHTML = `<strong>${stats.tv_shows}</strong> series`;
-    document.getElementById('statTrending').innerHTML = `🔥 <strong>${stats.trending}</strong> trending`;
-    document.getElementById('statNew').innerHTML = `🆕 <strong>${stats.new_this_week}</strong> new this week`;
+    if (stats) {
+        document.getElementById('statTotal').innerHTML = `<strong>${stats.total}</strong> titles`;
+        document.getElementById('statMovies').innerHTML = `<strong>${stats.movies}</strong> movies`;
+        document.getElementById('statShows').innerHTML = `<strong>${stats.tv_shows}</strong> series`;
+    }
+    // Taste-aware stats replace old trending/new counts
+    const taste = TasteEngine.getTasteVector();
+    const el4 = document.getElementById('statTaste');
+    const el5 = document.getElementById('statPersonalized');
+    if (el4 && taste.totalRatings > 0) {
+        const topSig = Object.entries(taste.signals)
+            .filter(([_, v]) => v > 0.05)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 2)
+            .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
+        el4.innerHTML = `✨ <strong>${topSig.join(' · ')}</strong>`;
+    }
+    if (el5 && taste.totalRatings > 0) {
+        el5.innerHTML = `🎯 <strong>${taste.totalRatings}</strong> analyzed`;
+    }
 }
 
 // ── Genre Menu ────────────────────────────────────────────────
@@ -84,8 +131,23 @@ let heroIndex = 0;
 let heroInterval = null;
 
 function renderHero() {
-    const trending = CATALOG.filter(t => t.trending && t.backdrop).slice(0, 6);
-    if (!trending.length) {
+    // Hero uses top affinity picks that have a backdrop
+    const hasTaste = TasteEngine.getTasteVector().totalRatings > 0;
+    let heroPool;
+    if (hasTaste) {
+        heroPool = [...CATALOG]
+            .filter(t => t.backdrop)
+            .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
+            .slice(0, 8);
+    } else {
+        heroPool = CATALOG.filter(t => t.backdrop && t.trending).slice(0, 6);
+        if (!heroPool.length) {
+            heroPool = [...CATALOG].filter(t => t.backdrop)
+                .sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 6);
+        }
+    }
+
+    if (!heroPool.length) {
         document.getElementById('heroSection').style.display = 'none';
         return;
     }
@@ -94,20 +156,21 @@ function renderHero() {
     const dots = document.getElementById('heroDots');
     carousel.innerHTML = '';
     dots.innerHTML = '';
+    if (heroInterval) clearInterval(heroInterval);
 
-    trending.forEach((t, i) => {
-        // Slide
+    heroPool.forEach((t, i) => {
         const slide = document.createElement('div');
         slide.className = 'hero-slide';
         const genres = (t.genres || []).slice(0, 2).join(', ');
         const year = t.date ? t.date.substring(0, 4) : '';
         const rating = t.rating ? `<span class="rating-star">★</span> ${t.rating}` : '';
         const meta = [rating, year, genres, t.type === 'movie' ? '🎬 Film' : '📺 Series'].filter(Boolean).join(' · ');
+        const badge = hasTaste ? '✨ Picked For You' : '🔥 Top Pick';
 
         slide.innerHTML = `
             <div class="hero-slide-bg" style="background-image:url('${t.backdrop}')"></div>
             <div class="hero-slide-content">
-                <div class="hero-badge">${t.trending ? '🔥 Trending' : '🆕 New'}</div>
+                <div class="hero-badge">${badge}</div>
                 <h2 class="hero-title">${escHtml(t.title)}</h2>
                 <div class="hero-meta">${meta}</div>
                 <p class="hero-overview">${escHtml(t.overview || '')}</p>
@@ -116,7 +179,6 @@ function renderHero() {
         slide.addEventListener('click', () => openModal(t));
         carousel.appendChild(slide);
 
-        // Dot
         const dot = document.createElement('div');
         dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
         dot.addEventListener('click', () => goToHeroSlide(i));
@@ -124,7 +186,7 @@ function renderHero() {
     });
 
     heroInterval = setInterval(() => {
-        goToHeroSlide((heroIndex + 1) % trending.length);
+        goToHeroSlide((heroIndex + 1) % heroPool.length);
     }, 6000);
 }
 
@@ -134,27 +196,77 @@ function goToHeroSlide(idx) {
     document.querySelectorAll('.hero-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
 }
 
-// ── Scroll Rows ───────────────────────────────────────────────
-function renderTrendingRow() {
-    const items = CATALOG.filter(t => t.trending).slice(0, 20);
-    const row = document.getElementById('trendingRow');
-    if (!items.length) {
-        document.getElementById('trendingSection').style.display = 'none';
-        return;
-    }
-    row.innerHTML = items.map(t => buildPosterCard(t)).join('');
-    bindPosterEvents(row);
-}
 
-function renderNewRow() {
-    const items = CATALOG.filter(t => t.new).slice(0, 20);
-    const row = document.getElementById('newRow');
-    if (!items.length) {
-        document.getElementById('newSection').style.display = 'none';
-        return;
+// ── Curated Sections (replaces Trending/New rows) ────────────────
+// Maps internal taste signals to display genre names
+const SIGNAL_TO_GENRE = {
+    drama: 'Drama', comedy: 'Comedy', thriller: 'Thriller', crime: 'Crime',
+    action: 'Action', romance: 'Romance', horror: 'Horror', scifi: 'Science Fiction',
+    animation: 'Animation', documentary: 'Documentary',
+};
+
+function renderCuratedSections() {
+    const taste = TasteEngine.getTasteVector();
+    const hasTaste = taste.totalRatings > 0;
+
+    // ── Row 1: Top Picks For You ───────────────────────────────
+    const topPicks = [...CATALOG]
+        .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
+        .slice(0, 24);
+    const topPicksRow = document.getElementById('topPicksRow');
+    topPicksRow.innerHTML = topPicks.map(t => buildPosterCard(t)).join('');
+    bindPosterEvents(topPicksRow);
+    if (hasTaste) {
+        document.getElementById('topPicksTitle').textContent = '✨ Top Picks For You';
+        document.getElementById('topPicksSubtitle').textContent =
+            `${taste.totalRatings} titles rated · personalized`;
+    } else {
+        document.getElementById('topPicksTitle').textContent = '🏆 Top Rated';
+        document.getElementById('topPicksSubtitle').textContent = 'Highest quality in the catalog';
     }
-    row.innerHTML = items.map(t => buildPosterCard(t)).join('');
-    bindPosterEvents(row);
+
+    // ── Row 2: Because You Love… ────────────────────────────
+    const topSignal = Object.entries(taste.signals)
+        .filter(([k]) => SIGNAL_TO_GENRE[k])
+        .sort(([, a], [, b]) => b - a)[0];
+    const becauseSection = document.getElementById('becauseSection');
+    const becauseRow = document.getElementById('becauseRow');
+    if (topSignal && topSignal[1] > 0.05) {
+        const [signal, strength] = topSignal;
+        const genre = SIGNAL_TO_GENRE[signal];
+        document.getElementById('becauseTitle').textContent = `🎭 Because You Love ${genre}`;
+        document.getElementById('becauseSubtitle').textContent =
+            `Your #1 taste dimension (${Math.round(strength * 100)}% affinity)`;
+        const gf = genre.toLowerCase();
+        const becauseItems = [...CATALOG]
+            .filter(t => (t.genres || []).some(g => g.toLowerCase().includes(gf)))
+            .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
+            .slice(0, 24);
+        becauseRow.innerHTML = becauseItems.map(t => buildPosterCard(t)).join('');
+        bindPosterEvents(becauseRow);
+    } else {
+        document.getElementById('becauseTitle').textContent = '🎥 Critics\u2019 Favourites';
+        document.getElementById('becauseSubtitle').textContent = 'Acclaimed films on Prime Video NL';
+        const criticsItems = [...CATALOG]
+            .sort((a, b) => (b.interest_score || 0) - (a.interest_score || 0))
+            .slice(0, 24);
+        becauseRow.innerHTML = criticsItems.map(t => buildPosterCard(t)).join('');
+        bindPosterEvents(becauseRow);
+    }
+    becauseSection.style.display = '';
+
+    // ── Row 3: Hidden Gems ───────────────────────────────────
+    const gems = [...CATALOG]
+        .filter(t => (t.interest_score || 0) >= 55 && (t.popularity || 0) < 40)
+        .sort((a, b) => (b.interest_score || 0) - (a.interest_score || 0))
+        .slice(0, 24);
+    const gemsRow = document.getElementById('hiddenGemsRow');
+    if (gems.length) {
+        gemsRow.innerHTML = gems.map(t => buildPosterCard(t)).join('');
+        bindPosterEvents(gemsRow);
+    } else {
+        document.getElementById('hiddenGemsSection').style.display = 'none';
+    }
 }
 
 // ── Catalog Grid ──────────────────────────────────────────────
@@ -166,17 +278,16 @@ function getFilteredCatalog() {
         items = items.filter(t => t.type === state.typeFilter);
     }
 
-    // Genre filter
+    // Genre filter — fuzzy: 'Action' matches 'Action' AND 'Action & Adventure'
     if (state.genreFilter) {
-        items = items.filter(t => (t.genres || []).includes(state.genreFilter));
+        const gf = state.genreFilter.toLowerCase();
+        items = items.filter(t =>
+            (t.genres || []).some(g => g.toLowerCase().includes(gf) || gf.includes(g.toLowerCase()))
+        );
     }
 
-    // Special filter
-    if (state.specialFilter === 'trending') {
-        items = items.filter(t => t.trending);
-    } else if (state.specialFilter === 'new') {
-        items = items.filter(t => t.new);
-    } else if (state.specialFilter === 'watchlist') {
+    // Special filter: only watchlist remains
+    if (state.specialFilter === 'watchlist') {
         items = items.filter(t => WATCHLIST.has(t.id));
     }
 
@@ -197,6 +308,14 @@ function getFilteredCatalog() {
     switch (state.sortBy) {
         case 'popularity':
             items.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+            break;
+        case 'foryou':
+            // Taste Engine: personalized sort
+            items.sort((a, b) => {
+                const affinityA = TasteEngine.computeAffinity(a, a.interest_score);
+                const affinityB = TasteEngine.computeAffinity(b, b.interest_score);
+                return affinityB - affinityA;
+            });
             break;
         case 'rating':
             items.sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -358,6 +477,35 @@ function openModal(t) {
         `;
     }
 
+    // ── n/10 Rating Widget ─────────────────────────────────
+    const currentRating = TasteEngine.getRating(t.id);
+    const ratingLabels = {
+        1: 'Awful', 2: 'Bad', 3: 'Poor', 4: 'Meh',
+        5: 'Okay', 6: 'Decent', 7: 'Good',
+        8: 'Great', 9: 'Excellent', 10: 'Masterpiece'
+    };
+    const ratingDots = Array.from({length: 10}, (_, i) => {
+        const score = i + 1;
+        const isActive = currentRating && score <= currentRating;
+        const isSelected = currentRating && score === currentRating;
+        return `<button class="modal-rating-dot ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}" 
+                        data-score="${score}" title="${score}/10">${score}</button>`;
+    }).join('');
+
+    const scoreDisplay = currentRating 
+        ? `${currentRating}/10<span class="score-label">${ratingLabels[currentRating]}</span>`
+        : `<span style="font-size:12px;color:var(--text-muted)">Rate</span>`;
+
+    const ratingWidgetHtml = `
+        <div class="modal-rating-widget" id="modalRatingWidget">
+            <div class="modal-rating-label">Your Rating</div>
+            <div class="modal-rating-dots" id="modalRatingDots">
+                ${ratingDots}
+            </div>
+            <div class="modal-rating-score" id="modalRatingScore">${scoreDisplay}</div>
+        </div>
+    `;
+
     content.innerHTML = `
         <h2 class="modal-title">${escHtml(t.title)}</h2>
         <div class="modal-meta">${metaParts.join(' · ')}</div>
@@ -369,6 +517,7 @@ function openModal(t) {
                 ${isSaved ? '★ In Watchlist' : '☆ Add to Watchlist'}
             </button>
         </div>
+        ${ratingWidgetHtml}
         ${trailerHtml}
     `;
 
@@ -379,7 +528,79 @@ function openModal(t) {
         const saved = WATCHLIST.has(t.id);
         btn.classList.toggle('saved', saved);
         btn.innerHTML = saved ? '★ In Watchlist' : '☆ Add to Watchlist';
+        // Behavioral signal
+        TasteEngine.recordSignal(saved ? 'add_watchlist' : 'remove_watchlist', t);
+        updateTasteIndicator();
     });
+
+    // Bind n/10 rating dots
+    content.querySelectorAll('.modal-rating-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            const score = parseInt(e.currentTarget.dataset.score);
+            TasteEngine.processRating(t.id, score, t);
+            // Update visual
+            content.querySelectorAll('.modal-rating-dot').forEach(d => {
+                const s = parseInt(d.dataset.score);
+                d.classList.toggle('active', s <= score);
+                d.classList.toggle('selected', s === score);
+            });
+            const scoreEl = document.getElementById('modalRatingScore');
+            scoreEl.innerHTML = `${score}/10<span class="score-label">${ratingLabels[score]}</span>`;
+            updateTasteIndicator();
+        });
+
+        // Hover preview
+        dot.addEventListener('mouseenter', (e) => {
+            const previewScore = parseInt(e.currentTarget.dataset.score);
+            content.querySelectorAll('.modal-rating-dot').forEach(d => {
+                const s = parseInt(d.dataset.score);
+                d.classList.toggle('active', s <= previewScore);
+            });
+            const scoreEl = document.getElementById('modalRatingScore');
+            scoreEl.innerHTML = `${previewScore}/10<span class="score-label">${ratingLabels[previewScore]}</span>`;
+        });
+
+        dot.addEventListener('mouseleave', () => {
+            const actual = TasteEngine.getRating(t.id);
+            content.querySelectorAll('.modal-rating-dot').forEach(d => {
+                const s = parseInt(d.dataset.score);
+                d.classList.toggle('active', actual && s <= actual);
+                d.classList.toggle('selected', actual && s === actual);
+            });
+            const scoreEl = document.getElementById('modalRatingScore');
+            if (actual) {
+                scoreEl.innerHTML = `${actual}/10<span class="score-label">${ratingLabels[actual]}</span>`;
+            } else {
+                scoreEl.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Rate</span>`;
+            }
+        });
+    });
+
+    // Behavioral signal: opened detail
+    TasteEngine.recordSignal('click_poster', t);
+
+    // Track trailer plays
+    if (t.trailer_key) {
+        const iframe = content.querySelector('.modal-trailer iframe');
+        if (iframe) {
+            iframe.addEventListener('load', () => {
+                TasteEngine.recordSignal('play_trailer', t);
+            });
+        }
+    }
+
+    // Long view tracking (>10s)
+    const modalOpenTime = Date.now();
+    const longViewCheck = setInterval(() => {
+        if (!document.getElementById('modalOverlay').classList.contains('open')) {
+            clearInterval(longViewCheck);
+            return;
+        }
+        if (Date.now() - modalOpenTime > 10000) {
+            TasteEngine.recordSignal('long_view', t);
+            clearInterval(longViewCheck);
+        }
+    }, 5000);
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -405,29 +626,31 @@ function toggleWatchlist(id) {
 
 // ── Events ────────────────────────────────────────────────────
 function bindEvents() {
-    // Type filter buttons
+    // Type + special filter buttons
     document.querySelectorAll('[data-filter]').forEach(btn => {
         btn.addEventListener('click', () => {
             const filter = btn.dataset.filter;
 
-            if (['all', 'movie', 'tv'].includes(filter)) {
-                state.typeFilter = filter;
+            if (filter === 'all') {
+                state.typeFilter = 'all';
                 state.specialFilter = null;
-                document.querySelectorAll('.filter-group:first-child .filter-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                // Deactivate special filters
-                ['filterTrending', 'filterNew', 'filterWatchlist'].forEach(id => {
-                    document.getElementById(id).classList.remove('active');
-                });
-            } else if (['trending', 'new', 'watchlist'].includes(filter)) {
+            } else if (['movie', 'tv'].includes(filter)) {
+                state.typeFilter = filter;
+                // Keep special filter active, deactivate other type buttons
+                document.querySelectorAll('[data-filter="all"],[data-filter="movie"],[data-filter="tv"]')
+                    .forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            } else if (filter === 'watchlist') {
+                // Toggle watchlist filter
                 if (state.specialFilter === filter) {
                     state.specialFilter = null;
                     btn.classList.remove('active');
                 } else {
                     state.specialFilter = filter;
-                    ['filterTrending', 'filterNew', 'filterWatchlist'].forEach(id => {
-                        document.getElementById(id).classList.remove('active');
-                    });
+                    document.querySelectorAll('[data-filter="watchlist"]')
+                        .forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                 }
             }
@@ -444,7 +667,7 @@ function bindEvents() {
             state.gridPage = 0;
             document.querySelectorAll('#sortMenu .dropdown-item').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const labels = { popularity: 'Popular', rating: 'Top Rated', newest: 'Newest', az: 'A → Z' };
+            const labels = { popularity: 'Popular', foryou: '✨ For You', rating: 'Top Rated', newest: 'Newest', az: 'A → Z' };
             document.getElementById('sortBtn').textContent = `Sort: ${labels[state.sortBy]} ▾`;
             document.getElementById('sortDropdown').classList.remove('open');
             renderCatalogGrid();
@@ -563,4 +786,47 @@ function escHtml(str) {
 
 function escAttr(str) {
     return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ── Taste Indicator ──────────────────────────────────────────
+function updateTasteIndicator() {
+    const indicator = document.getElementById('tasteIndicator');
+    const label = document.getElementById('tasteIndicatorLabel');
+    if (!indicator) return;
+
+    const taste = TasteEngine.getTasteVector();
+    const ratings = taste.totalRatings || 0;
+
+    if (ratings === 0 && !TasteEngine.isOnboardingDone()) {
+        label.textContent = 'Set Up Profile';
+        indicator.onclick = () => OnboardingQuiz.show();
+    } else {
+        // Find top signals
+        const topSignals = Object.entries(taste.signals)
+            .filter(([_, v]) => v > 0.1)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 2)
+            .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
+
+        if (topSignals.length) {
+            label.textContent = topSignals.join(' · ');
+        } else {
+            label.textContent = `${ratings} rated`;
+        }
+
+        indicator.onclick = () => {
+            // Toggle For You sort
+            state.sortBy = state.sortBy === 'foryou' ? 'popularity' : 'foryou';
+            state.gridPage = 0;
+            const labels = { popularity: 'Popular', foryou: '✨ For You', rating: 'Top Rated', newest: 'Newest', az: 'A → Z' };
+            document.getElementById('sortBtn').textContent = `Sort: ${labels[state.sortBy]} ▾`;
+            document.querySelectorAll('#sortMenu .dropdown-item').forEach(b => {
+                b.classList.toggle('active', b.dataset.sort === state.sortBy);
+            });
+            renderCatalogGrid();
+            OnboardingQuiz.showToast(
+                state.sortBy === 'foryou' ? 'Sorted by your taste' : 'Sorted by popularity'
+            );
+        };
+    }
 }
