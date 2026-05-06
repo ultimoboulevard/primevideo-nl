@@ -983,3 +983,22 @@ a:hover { text-decoration: underline; }
     font-size: 48px;
     margin-bottom: 12px;
 }
+
+/* ── Curated Section Header ─────────────────────────────────── */
+.section-header-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.section-header-row .section-title {
+    margin-bottom: 0;
+}
+
+.section-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.2px;
+}

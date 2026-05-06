@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="taste.css">
 </head>
 <body>
     <!-- Header -->
@@ -19,6 +20,10 @@
                 <div class="search-box">
                     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                     <input type="text" id="searchInput" placeholder="Search titles, actors, directors…" autocomplete="off">
+                </div>
+                <div class="taste-indicator" id="tasteIndicator" title="Your taste profile">
+                    <span class="taste-indicator-dot"></span>
+                    <span id="tasteIndicatorLabel">Taste Profile</span>
                 </div>
             </div>
         </div>
@@ -41,6 +46,7 @@
                     <button class="dropdown-btn" id="sortBtn">Sort: Popular ▾</button>
                     <div class="dropdown-menu" id="sortMenu">
                         <button class="dropdown-item active" data-sort="popularity">Popular</button>
+                        <button class="dropdown-item" data-sort="foryou">✨ For You</button>
                         <button class="dropdown-item" data-sort="rating">Top Rated</button>
                         <button class="dropdown-item" data-sort="newest">Newest</button>
                         <button class="dropdown-item" data-sort="az">A → Z</button>
@@ -48,8 +54,6 @@
                 </div>
             </div>
             <div class="filter-group">
-                <button class="filter-btn" id="filterTrending" data-filter="trending">🔥 Trending</button>
-                <button class="filter-btn" id="filterNew" data-filter="new">🆕 New</button>
                 <button class="filter-btn" id="filterWatchlist" data-filter="watchlist">⭐ Watchlist</button>
             </div>
         </div>
@@ -72,16 +76,31 @@
         <div class="hero-dots" id="heroDots"></div>
     </section>
 
-    <!-- Trending Row -->
-    <section class="section" id="trendingSection">
-        <h2 class="section-title">🔥 Trending Now</h2>
-        <div class="scroll-row" id="trendingRow"></div>
+    <!-- Curated: Top Picks -->
+    <section class="section" id="topPicksSection">
+        <div class="section-header-row">
+            <h2 class="section-title" id="topPicksTitle">✨ Top Picks For You</h2>
+            <span class="section-subtitle" id="topPicksSubtitle">Based on your taste profile</span>
+        </div>
+        <div class="scroll-row" id="topPicksRow"></div>
     </section>
 
-    <!-- New This Week -->
-    <section class="section" id="newSection">
-        <h2 class="section-title">🆕 New This Week</h2>
-        <div class="scroll-row" id="newRow"></div>
+    <!-- Curated: Because You Love -->
+    <section class="section" id="becauseSection">
+        <div class="section-header-row">
+            <h2 class="section-title" id="becauseTitle">🎭 Because You Love…</h2>
+            <span class="section-subtitle" id="becauseSubtitle"></span>
+        </div>
+        <div class="scroll-row" id="becauseRow"></div>
+    </section>
+
+    <!-- Curated: Hidden Gems -->
+    <section class="section" id="hiddenGemsSection">
+        <div class="section-header-row">
+            <h2 class="section-title">💎 Hidden Gems</h2>
+            <span class="section-subtitle">High quality · Low mainstream noise</span>
+        </div>
+        <div class="scroll-row" id="hiddenGemsRow"></div>
     </section>
 
     <!-- Full Catalog Grid -->
@@ -117,6 +136,8 @@
         <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> · Updated daily · Prime Video NL</p>
     </footer>
 
+    <script src="taste.js"></script>
+    <script src="onboarding.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
