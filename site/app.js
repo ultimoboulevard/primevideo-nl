@@ -37,9 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('No bootstrap');
                 })
                 .then(bootstrap => {
-                    if (TasteEngine.getTasteVector().totalRatings === 0 && !TasteEngine.isOnboardingDone()) {
+                    const local = TasteEngine.getTasteVector();
+                    const bootstrapRatings = bootstrap.totalRatings || 0;
+                    // Always prefer the richer profile source
+                    if (bootstrapRatings > (local.totalRatings || 0)) {
                         TasteEngine.injectTaste(bootstrap);
-                        console.log('Taste profile bootstrapped from Excel history');
+                        console.log(`Taste profile bootstrapped from Excel history (${bootstrapRatings} titles vs ${local.totalRatings || 0} local)`);
+                    }
+                    // Activate taste sort if we have any taste data
+                    if (TasteEngine.getTasteVector().totalRatings > 0) {
                         state.sortBy = 'foryou';
                         document.getElementById('sortBtn').textContent = `Sort: ✨ For You ▾`;
                         document.querySelectorAll('#sortMenu .dropdown-item').forEach(b => {
@@ -49,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         renderHero();
                         renderCuratedSections();
                         renderCatalogGrid();
+                        renderStats(null); // refresh taste-aware stats
                     }
                     updateTasteIndicator();
                     OnboardingQuiz.scheduleShow();
@@ -67,12 +74,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Stats ─────────────────────────────────────────────────────
 function renderStats(stats) {
-    if (!stats) return;
-    document.getElementById('statTotal').innerHTML = `<strong>${stats.total}</strong> titles`;
-    document.getElementById('statMovies').innerHTML = `<strong>${stats.movies}</strong> movies`;
-    document.getElementById('statShows').innerHTML = `<strong>${stats.tv_shows}</strong> series`;
-    document.getElementById('statTrending').innerHTML = `🔥 <strong>${stats.trending}</strong> trending`;
-    document.getElementById('statNew').innerHTML = `🆕 <strong>${stats.new_this_week}</strong> new this week`;
+    if (stats) {
+        document.getElementById('statTotal').innerHTML = `<strong>${stats.total}</strong> titles`;
+        document.getElementById('statMovies').innerHTML = `<strong>${stats.movies}</strong> movies`;
+        document.getElementById('statShows').innerHTML = `<strong>${stats.tv_shows}</strong> series`;
+    }
+    // Taste-aware stats replace old trending/new counts
+    const taste = TasteEngine.getTasteVector();
+    const el4 = document.getElementById('statTaste');
+    const el5 = document.getElementById('statPersonalized');
+    if (el4 && taste.totalRatings > 0) {
+        const topSig = Object.entries(taste.signals)
+            .filter(([_, v]) => v > 0.05)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 2)
+            .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
+        el4.innerHTML = `✨ <strong>${topSig.join(' · ')}</strong>`;
+    }
+    if (el5 && taste.totalRatings > 0) {
+        el5.innerHTML = `🎯 <strong>${taste.totalRatings}</strong> analyzed`;
+    }
 }
 
 // ── Genre Menu ────────────────────────────────────────────────
@@ -621,14 +642,14 @@ function bindEvents() {
                 document.querySelectorAll('[data-filter="all"],[data-filter="movie"],[data-filter="tv"]')
                     .forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-            } else if (['trending', 'new', 'watchlist'].includes(filter)) {
-                // Toggle special filter
+            } else if (filter === 'watchlist') {
+                // Toggle watchlist filter
                 if (state.specialFilter === filter) {
                     state.specialFilter = null;
                     btn.classList.remove('active');
                 } else {
                     state.specialFilter = filter;
-                    document.querySelectorAll('[data-filter="trending"],[data-filter="new"],[data-filter="watchlist"]')
+                    document.querySelectorAll('[data-filter="watchlist"]')
                         .forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                 }
