@@ -88,6 +88,7 @@ def check_subtitles(max_requests: int = 50) -> dict:
     }
 
     stats = {"checked": 0, "with_en": 0, "with_it": 0, "no_subs": 0, "errors": 0, "not_on_prime": 0}
+    consecutive_429 = 0
 
     for i, title in enumerate(titles):
         tmdb_id = title["tmdb_id"]
@@ -107,13 +108,22 @@ def check_subtitles(max_requests: int = 50) -> dict:
                 time.sleep(retry_after)
                 resp = client.get(url, headers=headers, params={"country": "nl"})
 
-            if resp.status_code == 404:
+            if resp.status_code == 429:
+                consecutive_429 += 1
+                log.warning("  [%d/%d] %s — HTTP 429", i + 1, len(titles), title["title"])
+                stats["errors"] += 1
+                if consecutive_429 >= 3:
+                    log.warning("No going back — quota exhausted, stopping early")
+                    break
+            elif resp.status_code == 404:
+                consecutive_429 = 0
                 # Title not found in the API — mark as checked (no data)
                 update_subtitle_info(conn, tmdb_id, has_english=False, has_italian=False)
                 stats["checked"] += 1
                 stats["no_subs"] += 1
                 log.debug("  [%d/%d] %s — not found in API", i + 1, len(titles), title["title"])
             elif resp.status_code == 200:
+                consecutive_429 = 0
                 data = resp.json()
                 has_en, has_it = _extract_prime_subs(data)
 
@@ -139,10 +149,12 @@ def check_subtitles(max_requests: int = 50) -> dict:
                 label = " + ".join(subs_str) if subs_str else "none"
                 log.info("  [%d/%d] %s — subs: %s", i + 1, len(titles), title["title"], label)
             else:
+                consecutive_429 = 0
                 log.warning("  [%d/%d] %s — HTTP %d", i + 1, len(titles), title["title"], resp.status_code)
                 stats["errors"] += 1
 
         except httpx.HTTPError as e:
+            consecutive_429 = 0
             log.warning("  [%d/%d] %s — error: %s", i + 1, len(titles), title["title"], e)
             stats["errors"] += 1
 
