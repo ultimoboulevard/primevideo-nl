@@ -158,13 +158,20 @@ def export_catalog_json(days_new: int = 7) -> str:
 
 
 def _fetch_spotlight(max_items: int = 30) -> list[dict]:
-    """Fetch trending titles this week with NL watch provider availability.
+    """Fetch trending/new titles with NL watch provider availability.
 
-    This is channel-agnostic — shows what's hot regardless of platform.
+    Mixes 4 sources for daily variety:
+      1. trending/day  — changes daily (not weekly)
+      2. now_playing    — currently in theaters (NL)
+      3. upcoming       — coming soon
+      4. discover       — recent high-rated releases (last 90 days)
     """
+    import random
+    from datetime import timedelta
+
     client = httpx.Client(timeout=15)
     params = {"api_key": TMDB_API_KEY, "language": LANGUAGE}
-    spotlight = []
+    raw_items = []  # (item_dict, media_type, source_label)
     seen_ids = set()
 
     # Resolve genre_ids → genre names so TasteEngine can rank
@@ -178,63 +185,116 @@ def _fetch_spotlight(max_items: int = 30) -> list[dict]:
         except httpx.HTTPError:
             pass
 
+    def _add_results(results: list, media_type: str, label: str):
+        for item in results:
+            tmdb_id = item.get("id")
+            if not tmdb_id or tmdb_id in seen_ids:
+                continue
+            seen_ids.add(tmdb_id)
+            raw_items.append((item, media_type, label))
+
+    # ── Source 1: Trending today (changes daily) ──────────────
     for media_type in ("movie", "tv"):
         try:
             resp = client.get(
-                f"{TMDB_BASE_URL}/trending/{media_type}/week", params=params
+                f"{TMDB_BASE_URL}/trending/{media_type}/day", params=params
             )
             resp.raise_for_status()
-            results = resp.json().get("results", [])
+            _add_results(resp.json().get("results", []), media_type, "trending")
         except httpx.HTTPError as e:
-            log.warning("Spotlight fetch failed for %s: %s", media_type, e)
-            continue
+            log.warning("Spotlight trending/%s/day failed: %s", media_type, e)
 
-        for item in results:
-            tmdb_id = item["id"]
-            if tmdb_id in seen_ids:
-                continue
-            seen_ids.add(tmdb_id)
+    # ── Source 2: Now playing in theaters (NL) ────────────────
+    try:
+        resp = client.get(f"{TMDB_BASE_URL}/movie/now_playing", params={
+            **params, "region": WATCH_REGION
+        })
+        resp.raise_for_status()
+        _add_results(resp.json().get("results", []), "movie", "now_playing")
+    except httpx.HTTPError:
+        pass
 
-            # Fetch NL watch providers
-            available_on = []
-            try:
-                wp_resp = client.get(
-                    f"{TMDB_BASE_URL}/{media_type}/{tmdb_id}/watch/providers",
-                    params={"api_key": TMDB_API_KEY},
-                )
-                wp_resp.raise_for_status()
-                nl_data = wp_resp.json().get("results", {}).get("NL", {})
-                for prov in nl_data.get("flatrate", []):
-                    name = prov.get("provider_name", "")
-                    available_on.append({
-                        "name": name,
-                        "badge": PROVIDER_BADGES.get(name, ""),
-                        "logo": f"{TMDB_IMAGE_BASE}/w45{prov['logo_path']}" if prov.get("logo_path") else None,
-                    })
-            except httpx.HTTPError:
-                pass
-            time.sleep(0.1)
+    # ── Source 3: Upcoming releases ───────────────────────────
+    try:
+        resp = client.get(f"{TMDB_BASE_URL}/movie/upcoming", params={
+            **params, "region": WATCH_REGION
+        })
+        resp.raise_for_status()
+        _add_results(resp.json().get("results", []), "movie", "upcoming")
+    except httpx.HTTPError:
+        pass
 
-            title_key = "title" if media_type == "movie" else "name"
-            date_key = "release_date" if media_type == "movie" else "first_air_date"
+    # ── Source 4: Recent high-rated discoveries (last 90 days) ─
+    today = datetime.utcnow()
+    try:
+        resp = client.get(f"{TMDB_BASE_URL}/discover/movie", params={
+            **params,
+            "sort_by": "vote_average.desc",
+            "vote_count.gte": 50,
+            "primary_release_date.gte": (today - timedelta(days=90)).strftime("%Y-%m-%d"),
+            "primary_release_date.lte": today.strftime("%Y-%m-%d"),
+            "watch_region": WATCH_REGION,
+        })
+        resp.raise_for_status()
+        _add_results(resp.json().get("results", []), "movie", "discovery")
+    except httpx.HTTPError:
+        pass
 
-            spotlight.append({
-                "id": tmdb_id,
-                "type": media_type,
-                "title": item.get(title_key, ""),
-                "overview": (item.get("overview", "") or "")[:200],
-                "genres": [genre_map.get(gid, "") for gid in item.get("genre_ids", []) if gid in genre_map],
-                "rating": round(item.get("vote_average", 0), 1),
-                "votes": item.get("vote_count", 0),
-                "popularity": round(item.get("popularity", 0), 1),
-                "date": item.get(date_key, ""),
-                "poster": f"{TMDB_IMAGE_BASE}/w500{item['poster_path']}" if item.get("poster_path") else None,
-                "backdrop": f"{TMDB_IMAGE_BASE}/w780{item['backdrop_path']}" if item.get("backdrop_path") else None,
-                "available_on": available_on,
-            })
+    log.info("Spotlight raw pool: %d items from %d sources",
+             len(raw_items), len({label for _, _, label in raw_items}))
+
+    # ── Build spotlight entries with NL watch providers ────────
+    spotlight = []
+    for item, media_type, source in raw_items:
+        tmdb_id = item["id"]
+
+        # Fetch NL watch providers
+        available_on = []
+        try:
+            wp_resp = client.get(
+                f"{TMDB_BASE_URL}/{media_type}/{tmdb_id}/watch/providers",
+                params={"api_key": TMDB_API_KEY},
+            )
+            wp_resp.raise_for_status()
+            nl_data = wp_resp.json().get("results", {}).get("NL", {})
+            for prov in nl_data.get("flatrate", []):
+                name = prov.get("provider_name", "")
+                available_on.append({
+                    "name": name,
+                    "badge": PROVIDER_BADGES.get(name, ""),
+                    "logo": f"{TMDB_IMAGE_BASE}/w45{prov['logo_path']}" if prov.get("logo_path") else None,
+                })
+        except httpx.HTTPError:
+            pass
+        time.sleep(0.08)
+
+        title_key = "title" if media_type == "movie" else "name"
+        date_key = "release_date" if media_type == "movie" else "first_air_date"
+
+        spotlight.append({
+            "id": tmdb_id,
+            "type": media_type,
+            "source": source,
+            "title": item.get(title_key, ""),
+            "overview": (item.get("overview", "") or "")[:200],
+            "genres": [genre_map.get(gid, "") for gid in item.get("genre_ids", []) if gid in genre_map],
+            "rating": round(item.get("vote_average", 0), 1),
+            "votes": item.get("vote_count", 0),
+            "popularity": round(item.get("popularity", 0), 1),
+            "date": item.get(date_key, ""),
+            "poster": f"{TMDB_IMAGE_BASE}/w500{item['poster_path']}" if item.get("poster_path") else None,
+            "backdrop": f"{TMDB_IMAGE_BASE}/w780{item['backdrop_path']}" if item.get("backdrop_path") else None,
+            "available_on": available_on,
+        })
 
     client.close()
-    # Sort by rating descending, cap at max_items
+
+    # Date-seeded shuffle so same-day runs are stable, but different days rotate
+    day_seed = int(today.strftime("%Y%m%d"))
+    random.seed(day_seed)
+    random.shuffle(spotlight)
+
+    # Sort by rating (within the shuffled pool, top-rated bubble up)
     spotlight.sort(key=lambda x: x.get("rating", 0), reverse=True)
     return spotlight[:max_items]
 
