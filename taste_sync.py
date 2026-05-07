@@ -21,17 +21,33 @@ from config import (
 
 log = logging.getLogger(__name__)
 
-# Genre → taste signal mapping (same as taste.js client-side)
+# Genre → taste signal mapping (aligned with import_taste_history.py)
+# Each genre maps to a LIST of signals, not a single signal.
 GENRE_SIGNAL_MAP = {
-    'Drama': 'drama', 'Comedy': 'comedy', 'Action': 'action',
-    'Thriller': 'thriller', 'Horror': 'horror', 'Romance': 'romance',
-    'Science Fiction': 'scifi', 'Sci-Fi & Fantasy': 'scifi',
-    'Fantasy': 'fantasy', 'Animation': 'animation',
-    'Documentary': 'documentary', 'Crime': 'crime', 'Mystery': 'mystery',
-    'Adventure': 'adventure', 'Family': 'family', 'Music': 'music',
-    'War': 'war', 'History': 'history', 'Western': 'western',
-    'TV Movie': 'drama', 'Action & Adventure': 'action',
-    'War & Politics': 'war', 'Kids': 'family',
+    'Action': ['action', 'mainstream'],
+    'Adventure': ['action', 'mainstream'],
+    'Animation': ['animation'],
+    'Comedy': ['comedy'],
+    'Crime': ['crime', 'thriller'],
+    'Documentary': ['documentary', 'arthouse'],
+    'Drama': ['drama'],
+    'Family': ['mainstream'],
+    'Fantasy': ['scifi', 'mainstream'],
+    'History': ['classic', 'drama'],
+    'Horror': ['horror'],
+    'Music': ['indie'],
+    'Mystery': ['thriller', 'crime'],
+    'Romance': ['romance'],
+    'Science Fiction': ['scifi', 'visual'],
+    'Sci-Fi & Fantasy': ['scifi', 'visual'],
+    'TV Movie': ['mainstream'],
+    'Thriller': ['thriller'],
+    'War': ['drama', 'classic'],
+    'Western': ['classic'],
+    # TV-specific genres
+    'Action & Adventure': ['action', 'mainstream'],
+    'War & Politics': ['drama', 'classic'],
+    'Kids': ['mainstream'],
 }
 
 
@@ -116,8 +132,8 @@ def sync_taste() -> dict:
         weight = user_rating / 10.0
         for gid in item.get("genre_ids", []):
             genre_name = genre_map.get(gid, "")
-            signal = GENRE_SIGNAL_MAP.get(genre_name)
-            if signal:
+            mapped = GENRE_SIGNAL_MAP.get(genre_name, [])
+            for signal in mapped:
                 signal_weights[signal] += weight
 
     # Load existing profile (Excel bootstrap)
@@ -130,27 +146,31 @@ def sync_taste() -> dict:
                  existing.get("totalRatings", 0),
                  len(existing.get("signals", {})))
 
-    # Merge: existing signals + TMDB signals
+    # ── Merge: Excel baseline is SSOT, TMDB nudges it ─────────
+    # The Excel profile (890 titles) is the canonical normalization.
+    # TMDB ratings (few titles) should only NUDGE existing signals,
+    # not distort the entire vector via re-normalization.
     merged_signals = dict(existing.get("signals", {}))
-    if signal_weights:
-        # Normalize TMDB signals to 0-1 range
-        max_w = max(signal_weights.values()) if signal_weights else 1
+    existing_count = existing.get("totalRatings", 0)
+
+    if signal_weights and existing_count > 0:
+        max_w = max(signal_weights.values())
+        # Scale factor: TMDB influence proportional to its share of total data
+        tmdb_share = min(0.15, total_tmdb / max(existing_count, 1))
         for signal, weight in signal_weights.items():
             tmdb_normalized = weight / max_w
-            # Weighted merge: existing has more history, TMDB adds fresh signal
             existing_val = merged_signals.get(signal, 0)
-            existing_count = existing.get("totalRatings", 0)
-            if existing_count > 0:
-                # Blend: 70% existing + 30% TMDB (since TMDB ratings are fresh intent)
-                merged_signals[signal] = existing_val * 0.7 + tmdb_normalized * 0.3
-            else:
-                merged_signals[signal] = tmdb_normalized
+            # Additive nudge, not destructive blend
+            nudge = (tmdb_normalized - existing_val) * tmdb_share
+            merged_signals[signal] = max(0, existing_val + nudge)
+    elif signal_weights:
+        # No existing profile — TMDB is the only source
+        max_w = max(signal_weights.values())
+        for signal, weight in signal_weights.items():
+            merged_signals[signal] = round(weight / max_w, 4)
 
-    # Re-normalize so max signal = 1.0
-    if merged_signals:
-        max_sig = max(merged_signals.values())
-        if max_sig > 0:
-            merged_signals = {k: round(v / max_sig, 4) for k, v in merged_signals.items()}
+    # Round for clean JSON (do NOT re-normalize — Excel baseline is SSOT)
+    merged_signals = {k: round(v, 4) for k, v in merged_signals.items()}
 
     # Build output
     taste = {
