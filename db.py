@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS titles (
     director      TEXT,
     providers     TEXT DEFAULT '["prime"]',
     is_trending   INTEGER DEFAULT 0,
+    has_english_subs  INTEGER,
+    has_italian_subs  INTEGER,
+    subs_checked_at   TEXT,
     first_seen    TEXT,
     last_seen     TEXT,
     created_at    TEXT DEFAULT (datetime('now')),
@@ -46,6 +49,10 @@ CREATE INDEX IF NOT EXISTS idx_titles_first_seen ON titles(first_seen DESC);
 MIGRATIONS = [
     # Add providers column if missing (for existing DBs)
     "ALTER TABLE titles ADD COLUMN providers TEXT DEFAULT '[\"prime\"]'",
+    # Subtitle tracking columns
+    "ALTER TABLE titles ADD COLUMN has_english_subs INTEGER",
+    "ALTER TABLE titles ADD COLUMN has_italian_subs INTEGER",
+    "ALTER TABLE titles ADD COLUMN subs_checked_at TEXT",
 ]
 
 
@@ -193,6 +200,45 @@ def get_stats(conn: sqlite3.Connection) -> dict:
         "trending": trending, "new_this_week": new_7d,
         "prime_count": prime_count, "mubi_count": mubi_count, "both_count": both_count,
     }
+
+
+def get_titles_needing_sub_check(conn: sqlite3.Connection, max_items: int = 50) -> list[dict]:
+    """Titles where subtitles haven't been checked or cache expired (30 days).
+
+    Ordered by popularity DESC so the most important titles are checked first.
+    """
+    cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
+    rows = conn.execute("""
+        SELECT * FROM titles
+        WHERE has_english_subs IS NULL
+           OR subs_checked_at IS NULL
+           OR subs_checked_at < ?
+        ORDER BY popularity DESC
+        LIMIT ?
+    """, (cutoff, max_items)).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def update_subtitle_info(
+    conn: sqlite3.Connection,
+    tmdb_id: int,
+    has_english: bool | None,
+    has_italian: bool | None,
+) -> None:
+    """Update subtitle availability for a title."""
+    now = datetime.utcnow().isoformat()
+    conn.execute("""
+        UPDATE titles
+        SET has_english_subs = ?,
+            has_italian_subs = ?,
+            subs_checked_at = ?,
+            updated_at = ?
+        WHERE tmdb_id = ?
+    """, (
+        1 if has_english else (0 if has_english is not None else None),
+        1 if has_italian else (0 if has_italian is not None else None),
+        now, now, tmdb_id,
+    ))
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:

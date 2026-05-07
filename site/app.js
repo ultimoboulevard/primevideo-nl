@@ -36,6 +36,7 @@ let state = {
     providerFilter: null,    // null | 'prime' | 'mubi'
     sortBy: 'popularity',    // popularity | rating | newest | az
     specialFilter: null,     // null | trending | new | watchlist
+    subsFilter: false,       // true = show only titles with EN subs
     searchQuery: '',
     viewMode: 'grid',        // grid | list
     gridPage: 0,
@@ -434,6 +435,11 @@ function getFilteredCatalog() {
         items = items.filter(t => WATCHLIST.has(t.id));
     }
 
+    // Subtitle filter: show only titles with EN subs confirmed
+    if (state.subsFilter) {
+        items = items.filter(t => t.engSubs === true);
+    }
+
     // Search
     if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -530,6 +536,17 @@ function buildPosterCard(t) {
         badge = '<span class="poster-badge badge-new">NEW</span>';
     }
 
+    // Subtitle badge
+    let subsBadge = '';
+    if (t.engSubs === true) {
+        subsBadge = '<span class="poster-subs-badge subs-en">EN</span>';
+    } else if (t.itaSubs === true) {
+        subsBadge = '<span class="poster-subs-badge subs-it">IT</span>';
+    } else if (t.engSubs === false && t.itaSubs === false) {
+        subsBadge = '<span class="poster-subs-badge subs-none">⚠</span>';
+    }
+    // null = not yet checked → no badge
+
     const img = t.poster
         ? `<img class="poster-img" src="${t.poster}" alt="${escAttr(t.title)}" loading="lazy">`
         : `<div class="poster-no-image">${t.type === 'movie' ? '🎬' : '📺'}</div>`;
@@ -537,6 +554,7 @@ function buildPosterCard(t) {
     return `
         <div class="poster-card" data-id="${t.id}">
             ${badge}
+            ${subsBadge}
             <button class="poster-watchlist ${isSaved ? 'saved' : ''}" data-wl-id="${t.id}" title="Add to watchlist">
                 ${isSaved ? '★' : '☆'}
             </button>
@@ -659,12 +677,36 @@ function openModal(t) {
         </div>
     `;
 
+    // Subtitle info
+    let subsHtml = '';
+    if (t.engSubs !== null && t.engSubs !== undefined) {
+        const enClass = t.engSubs ? 'available' : 'unavailable';
+        const enIcon = t.engSubs ? '✓' : '✗';
+        const itClass = t.itaSubs ? 'available' : 'unavailable';
+        const itIcon = t.itaSubs ? '✓' : '✗';
+        subsHtml = `
+            <div class="modal-subs">
+                <span class="modal-subs-label">Subtitles</span>
+                <span class="modal-subs-tag ${enClass}">🇬🇧 English ${enIcon}</span>
+                <span class="modal-subs-tag ${itClass}">🇮🇹 Italian ${itIcon}</span>
+            </div>
+        `;
+    } else {
+        subsHtml = `
+            <div class="modal-subs">
+                <span class="modal-subs-label">Subtitles</span>
+                <span class="modal-subs-tag unknown">Not yet verified</span>
+            </div>
+        `;
+    }
+
     content.innerHTML = `
         <h2 class="modal-title">${escHtml(t.title)}</h2>
         <div class="modal-meta">${metaParts.join(' · ')}</div>
         <div>${genres}</div>
         <p class="modal-overview">${escHtml(t.overview || 'No description available.')}</p>
         ${castHtml}
+        ${subsHtml}
         <div class="modal-actions">
             <button class="modal-watchlist-btn ${isSaved ? 'saved' : ''}" data-wl-id="${t.id}">
                 ${isSaved ? '★ In Watchlist' : '☆ Add to Watchlist'}
@@ -825,6 +867,17 @@ function bindEvents() {
             renderCatalogGrid();
         });
     });
+
+    // Subtitle filter toggle
+    const subsBtn = document.getElementById('filterSubs');
+    if (subsBtn) {
+        subsBtn.addEventListener('click', () => {
+            state.subsFilter = !state.subsFilter;
+            subsBtn.classList.toggle('active', state.subsFilter);
+            state.gridPage = 0;
+            renderCatalogGrid();
+        });
+    }
 
     // Sort dropdown
     document.querySelectorAll('#sortMenu .dropdown-item').forEach(btn => {

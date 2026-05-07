@@ -1051,3 +1051,95 @@ a:hover { text-decoration: underline; }
     font-weight: 400;
     letter-spacing: 0.2px;
 }
+
+/* ── Subtitle Badges ─────────────────────────────────────────── */
+.poster-subs-badge {
+    position: absolute;
+    bottom: 50px;
+    right: 6px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    z-index: 3;
+    line-height: 1.2;
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+}
+
+.subs-en {
+    background: rgba(0, 180, 100, 0.85);
+    color: #fff;
+}
+
+.subs-it {
+    background: rgba(220, 140, 0, 0.85);
+    color: #fff;
+}
+
+.subs-none {
+    background: rgba(200, 50, 50, 0.8);
+    color: #fff;
+}
+
+/* Subtitle info in modal */
+.modal-subs {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+
+.modal-subs-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+}
+
+.modal-subs-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.modal-subs-tag.available {
+    background: rgba(0, 180, 100, 0.15);
+    color: #00d4aa;
+}
+
+.modal-subs-tag.unavailable {
+    background: rgba(200, 50, 50, 0.1);
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.modal-subs-tag.unknown {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Subtitle filter toggle */
+.filter-btn.subs-filter {
+    border-color: rgba(0, 180, 100, 0.3);
+}
+
+.filter-btn.subs-filter.active {
+    background: rgba(0, 180, 100, 0.85);
+    border-color: rgba(0, 180, 100, 0.85);
+    color: #fff;
+}
+

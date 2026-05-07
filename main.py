@@ -26,14 +26,28 @@ def cmd_taste_sync(args):
           f"{len(result['signals'])} signals")
 
 
+def cmd_subs(args):
+    """Check subtitle availability on Prime Video NL."""
+    from subtitle_checker import check_subtitles
+    max_req = getattr(args, "max_requests", 50)
+    stats = check_subtitles(max_requests=max_req)
+    print(f"Subtitle check: {stats}")
+
+
 def cmd_export(args):
-    """Sync taste + export database to JSON for static site."""
+    """Sync taste + check subtitles + export database to JSON for static site."""
     # Auto-sync taste profile before exporting
     from taste_sync import sync_taste
     try:
         sync_taste()
     except Exception as e:
         logging.getLogger(__name__).warning("Taste sync failed (non-fatal): %s", e)
+    # Check subtitles for unchecked titles
+    from subtitle_checker import check_subtitles
+    try:
+        check_subtitles(max_requests=50)
+    except Exception as e:
+        logging.getLogger(__name__).warning("Subtitle check failed (non-fatal): %s", e)
     from export_json import export_catalog_json
     path = export_catalog_json()
     print(f"Exported to {path}")
@@ -96,6 +110,9 @@ def main():
     sub.add_parser("export", help="Sync taste + export DB to JSON")
     sub.add_parser("taste-sync", help="Sync taste profile from TMDB ratings")
 
+    p_subs = sub.add_parser("subs", help="Check subtitle availability on Prime Video NL")
+    p_subs.add_argument("--max-requests", type=int, default=50)
+
     p_digest = sub.add_parser("digest", help="Generate HTML digest")
     p_digest.add_argument("--days", type=int, default=7)
 
@@ -113,6 +130,7 @@ def main():
         "collect": cmd_collect,
         "export": cmd_export,
         "taste-sync": cmd_taste_sync,
+        "subs": cmd_subs,
         "digest": cmd_digest,
         "send": cmd_send,
         "site": cmd_site,

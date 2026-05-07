@@ -36,5 +36,9 @@ EMAIL_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
 EMAIL_RECIPIENT = "francescozaccaria@me.com"
 
+# ── Streaming Availability API (subtitle check) ───────────────
+STREAMING_API_KEY = "motn-key-v4-JozHzFmx7M4XpHTkiHiXBkIjHisY7d3H"
+STREAMING_API_BASE = "https://api.movieofthenight.com/v4"
+
 # ── Site ───────────────────────────────────────────────────────
 SITE_URL = "https://ultimoboulevard.github.io/primevideo-nl/"

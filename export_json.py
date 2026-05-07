@@ -131,6 +131,8 @@ def export_catalog_json(days_new: int = 7) -> str:
             "new": t["tmdb_id"] in new_ids,
             "first_seen": t.get("first_seen", ""),
             "interest_score": _compute_interest_score(t),
+            "engSubs": True if t.get("has_english_subs") == 1 else (False if t.get("has_english_subs") == 0 else None),
+            "itaSubs": True if t.get("has_italian_subs") == 1 else (False if t.get("has_italian_subs") == 0 else None),
         }
         catalog.append(entry)
 
