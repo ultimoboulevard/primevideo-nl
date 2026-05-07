@@ -16,8 +16,12 @@ TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "8906d69b5882c693d04af4c7c8282fc9"
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 
-# Prime Video NL = provider_id 119 on TMDB
+# Prime Video NL = provider_id 119, MUBI NL = provider_id 11 on TMDB
 PRIME_PROVIDER_ID = 119
+PROVIDERS = {
+    "prime": {"id": 119, "label": "Prime Video", "badge": "▶"},
+    "mubi":  {"id": 11,  "label": "MUBI",         "badge": "Ⓜ"},
+}
 WATCH_REGION = "NL"
 LANGUAGE = "en-US"
 

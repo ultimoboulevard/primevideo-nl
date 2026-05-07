@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prime Video NL — What's New</title>
-    <meta name="description" content="Browse the full Amazon Prime Video Netherlands catalog. Discover new movies, trending series, and hidden gems updated daily.">
+    <title>NirvanAI — Personalized Cinema Discovery</title>
+    <meta name="description" content="Your AI-powered cinema discovery hub. Browse Prime Video and MUBI Netherlands catalogs with personalized taste-driven recommendations.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
     <!-- Header -->
     <header class="header" id="header">
         <div class="header-inner">
-            <h1 class="logo">🎬 Prime Video NL</h1>
+            <h1 class="logo">🧠 NirvanAI</h1>
             <div class="header-actions">
                 <div class="search-box">
                     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -52,6 +52,11 @@
                         <button class="dropdown-item" data-sort="az">A → Z</button>
                     </div>
                 </div>
+            </div>
+            <div class="filter-group">
+                <button class="filter-btn filter-provider active" data-provider="all" id="providerAll">All</button>
+                <button class="filter-btn filter-provider" data-provider="prime" id="providerPrime">▶ Prime</button>
+                <button class="filter-btn filter-provider" data-provider="mubi" id="providerMubi">Ⓜ MUBI</button>
             </div>
             <div class="filter-group">
                 <button class="filter-btn" id="filterWatchlist" data-filter="watchlist">⭐ Watchlist</button>
@@ -103,6 +108,15 @@
         <div class="scroll-row" id="hiddenGemsRow"></div>
     </section>
 
+    <!-- Curated: On MUBI -->
+    <section class="section" id="mubiSection" style="display:none">
+        <div class="section-header-row">
+            <h2 class="section-title" id="mubiTitle">🎬 On MUBI</h2>
+            <span class="section-subtitle" id="mubiSubtitle">Curated arthouse · International cinema</span>
+        </div>
+        <div class="scroll-row" id="mubiRow"></div>
+    </section>
+
     <!-- Full Catalog Grid -->
     <section class="section" id="catalogSection">
         <div class="catalog-header">
@@ -133,7 +147,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> · Updated daily · Prime Video NL</p>
+        <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> · Updated daily · NirvanAI</p>
     </footer>
 
     <script src="taste.js"></script>

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS titles (
     trailer_key   TEXT,
     cast_names    TEXT,
     director      TEXT,
+    providers     TEXT DEFAULT '["prime"]',
     is_trending   INTEGER DEFAULT 0,
     first_seen    TEXT,
     last_seen     TEXT,
@@ -42,6 +43,11 @@ CREATE INDEX IF NOT EXISTS idx_titles_trending ON titles(is_trending);
 CREATE INDEX IF NOT EXISTS idx_titles_first_seen ON titles(first_seen DESC);
 """
 
+MIGRATIONS = [
+    # Add providers column if missing (for existing DBs)
+    "ALTER TABLE titles ADD COLUMN providers TEXT DEFAULT '[\"prime\"]'",
+]
+
 
 def init_db() -> sqlite3.Connection:
     """Initialize database and return connection."""
@@ -49,27 +55,41 @@ def init_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # Run migrations (silently skip if already applied)
+    for migration in MIGRATIONS:
+        try:
+            conn.execute(migration)
+        except sqlite3.OperationalError:
+            pass  # Column already exists
     conn.commit()
     return conn
 
 
-def upsert_title(conn: sqlite3.Connection, data: dict) -> bool:
+def upsert_title(conn: sqlite3.Connection, data: dict, provider: str = "prime") -> bool:
     """Insert or update a title. Returns True if it was a new insertion."""
     now = datetime.utcnow().isoformat()
     existing = conn.execute(
-        "SELECT tmdb_id, first_seen FROM titles WHERE tmdb_id = ?",
+        "SELECT tmdb_id, first_seen, providers FROM titles WHERE tmdb_id = ?",
         (data["tmdb_id"],)
     ).fetchone()
 
     if existing:
+        # Merge providers list
+        try:
+            current_providers = json.loads(existing["providers"] or '[]')
+        except (json.JSONDecodeError, TypeError):
+            current_providers = []
+        if provider not in current_providers:
+            current_providers.append(provider)
+
         conn.execute("""
             UPDATE titles SET
                 title = ?, overview = ?, genres = ?, release_date = ?,
                 vote_average = ?, vote_count = ?, popularity = ?,
                 poster_path = ?, backdrop_path = ?, runtime = ?,
                 seasons = ?, trailer_key = ?, cast_names = ?,
-                director = ?, is_trending = ?, last_seen = ?,
-                updated_at = ?
+                director = ?, providers = ?, is_trending = ?,
+                last_seen = ?, updated_at = ?
             WHERE tmdb_id = ?
         """, (
             data.get("title"), data.get("overview"),
@@ -82,6 +102,7 @@ def upsert_title(conn: sqlite3.Connection, data: dict) -> bool:
             data.get("trailer_key"),
             json.dumps(data.get("cast_names", [])),
             data.get("director"),
+            json.dumps(current_providers),
             data.get("is_trending", 0),
             now, now, data["tmdb_id"]
         ))
@@ -92,9 +113,9 @@ def upsert_title(conn: sqlite3.Connection, data: dict) -> bool:
                 tmdb_id, media_type, title, overview, genres,
                 release_date, vote_average, vote_count, popularity,
                 poster_path, backdrop_path, runtime, seasons,
-                trailer_key, cast_names, director, is_trending,
-                first_seen, last_seen
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trailer_key, cast_names, director, providers,
+                is_trending, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data["tmdb_id"], data["media_type"],
             data.get("title"), data.get("overview"),
@@ -107,6 +128,7 @@ def upsert_title(conn: sqlite3.Connection, data: dict) -> bool:
             data.get("trailer_key"),
             json.dumps(data.get("cast_names", [])),
             data.get("director"),
+            json.dumps([provider]),
             data.get("is_trending", 0),
             now, now
         ))
@@ -162,19 +184,26 @@ def get_stats(conn: sqlite3.Connection) -> dict:
     tv = conn.execute("SELECT COUNT(*) FROM titles WHERE media_type='tv'").fetchone()[0]
     trending = conn.execute("SELECT COUNT(*) FROM titles WHERE is_trending=1").fetchone()[0]
     new_7d = len(get_new_this_week(conn, 7))
+    # Provider stats
+    prime_count = conn.execute("SELECT COUNT(*) FROM titles WHERE providers LIKE '%prime%'").fetchone()[0]
+    mubi_count = conn.execute("SELECT COUNT(*) FROM titles WHERE providers LIKE '%mubi%'").fetchone()[0]
+    both_count = conn.execute("SELECT COUNT(*) FROM titles WHERE providers LIKE '%prime%' AND providers LIKE '%mubi%'").fetchone()[0]
     return {
         "total": total, "movies": movies, "tv_shows": tv,
-        "trending": trending, "new_this_week": new_7d
+        "trending": trending, "new_this_week": new_7d,
+        "prime_count": prime_count, "mubi_count": mubi_count, "both_count": both_count,
     }
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
     """Convert a Row to a plain dict with parsed JSON fields."""
     d = dict(row)
-    for field in ("genres", "cast_names"):
+    for field in ("genres", "cast_names", "providers"):
         if d.get(field):
             try:
                 d[field] = json.loads(d[field])
             except (json.JSONDecodeError, TypeError):
                 d[field] = []
+        elif field == "providers":
+            d[field] = ["prime"]  # Default for old rows
     return d

@@ -100,6 +100,7 @@ def export_catalog_json(days_new: int = 7) -> str:
         entry = {
             "id": t["tmdb_id"],
             "type": t["media_type"],
+            "providers": t.get("providers", ["prime"]),
             "title": t["title"],
             "overview": t.get("overview", ""),
             "genres": t.get("genres", []),

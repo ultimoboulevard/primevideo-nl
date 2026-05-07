@@ -1,4 +1,4 @@
-/* ── Prime Video NL — Client App ─────────────────────────────── */
+/* ── NirvanAI — Personalized Cinema Discovery ────────────────── */
 'use strict';
 
 let CATALOG = [];
@@ -9,6 +9,7 @@ let WATCHLIST = new Set(JSON.parse(localStorage.getItem('pvnl_watchlist') || '[]
 let state = {
     typeFilter: 'all',      // all | movie | tv
     genreFilter: null,       // null or genre string
+    providerFilter: null,    // null | 'prime' | 'mubi'
     sortBy: 'popularity',    // popularity | rating | newest | az
     specialFilter: null,     // null | trending | new | watchlist
     searchQuery: '',
@@ -277,6 +278,26 @@ function renderCuratedSections() {
     } else {
         document.getElementById('hiddenGemsSection').style.display = 'none';
     }
+
+    // ── Row 4: On MUBI ───────────────────────────────────────
+    const mubiItems = [...CATALOG]
+        .filter(t => (t.providers || []).includes('mubi'))
+        .filter(t => !usedIds.has(t.id))
+        .sort((a, b) => TasteEngine.computeAffinity(b, b.interest_score) - TasteEngine.computeAffinity(a, a.interest_score))
+        .slice(0, 24);
+    const mubiSection = document.getElementById('mubiSection');
+    const mubiRow = document.getElementById('mubiRow');
+    if (mubiItems.length) {
+        mubiItems.forEach(t => usedIds.add(t.id));
+        mubiRow.innerHTML = mubiItems.map(t => buildPosterCard(t)).join('');
+        bindPosterEvents(mubiRow);
+        const mubiTotal = CATALOG.filter(t => (t.providers || []).includes('mubi')).length;
+        document.getElementById('mubiSubtitle').textContent =
+            `${mubiTotal} curated titles · Arthouse & international cinema`;
+        mubiSection.style.display = '';
+    } else {
+        mubiSection.style.display = 'none';
+    }
 }
 
 // ── Catalog Grid ──────────────────────────────────────────────
@@ -294,6 +315,11 @@ function getFilteredCatalog() {
         items = items.filter(t =>
             (t.genres || []).some(g => g.toLowerCase().includes(gf) || gf.includes(g.toLowerCase()))
         );
+    }
+
+    // Provider filter
+    if (state.providerFilter) {
+        items = items.filter(t => (t.providers || ['prime']).includes(state.providerFilter));
     }
 
     // Special filter: only watchlist remains
@@ -386,8 +412,16 @@ function buildPosterCard(t) {
     const meta = [rating, year].filter(Boolean).join(' · ');
 
     let badge = '';
-    if (t.trending) badge = '<span class="poster-badge badge-trending">🔥</span>';
-    else if (t.new) badge = '<span class="poster-badge badge-new">NEW</span>';
+    const provs = t.providers || ['prime'];
+    if (provs.includes('mubi') && provs.includes('prime')) {
+        badge = '<span class="poster-badge badge-both">▶ Ⓜ</span>';
+    } else if (provs.includes('mubi')) {
+        badge = '<span class="poster-badge badge-mubi">Ⓜ</span>';
+    } else if (t.trending) {
+        badge = '<span class="poster-badge badge-trending">🔥</span>';
+    } else if (t.new) {
+        badge = '<span class="poster-badge badge-new">NEW</span>';
+    }
 
     const img = t.poster
         ? `<img class="poster-img" src="${t.poster}" alt="${escAttr(t.title)}" loading="lazy">`
@@ -419,6 +453,8 @@ function buildListItem(t) {
     let badges = '';
     if (t.trending) badges += '<span class="list-badge list-badge-trending">🔥</span>';
     if (t.new) badges += '<span class="list-badge list-badge-new">NEW</span>';
+    const provs = t.providers || ['prime'];
+    if (provs.includes('mubi')) badges += '<span class="list-badge list-badge-mubi">Ⓜ</span>';
     badges += t.type === 'movie'
         ? '<span class="list-badge list-badge-movie">Film</span>'
         : '<span class="list-badge list-badge-tv">Series</span>';
@@ -666,6 +702,18 @@ function bindEvents() {
             }
 
             state.gridPage = 0;
+            renderCatalogGrid();
+        });
+    });
+
+    // Provider filter buttons
+    document.querySelectorAll('[data-provider]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const prov = btn.dataset.provider;
+            state.providerFilter = prov === 'all' ? null : prov;
+            state.gridPage = 0;
+            document.querySelectorAll('[data-provider]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             renderCatalogGrid();
         });
     });

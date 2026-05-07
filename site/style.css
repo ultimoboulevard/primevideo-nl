@@ -461,6 +461,17 @@ a:hover { text-decoration: underline; }
     color: #000;
 }
 
+.badge-mubi {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #e94560;
+}
+
+.badge-both {
+    background: linear-gradient(135deg, #00a8e1, #e94560);
+    color: #fff;
+    letter-spacing: 1px;
+}
+
 .poster-watchlist {
     position: absolute;
     top: 8px;
@@ -648,6 +659,7 @@ a:hover { text-decoration: underline; }
 .list-badge-new { background: var(--accent-primary); color: #000; }
 .list-badge-movie { background: rgba(124,92,252,0.2); color: var(--accent-secondary); }
 .list-badge-tv { background: rgba(0,212,170,0.15); color: var(--accent-primary); }
+.list-badge-mubi { background: rgba(233,69,96,0.15); color: #e94560; }
 
 .list-item-meta {
     font-size: 12px;
