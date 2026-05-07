@@ -13,7 +13,6 @@ v2: Added director-based auteur layer — no extra API calls needed,
 
 import json
 import sqlite3
-import httpx
 import time
 import os
 from collections import defaultdict
@@ -162,6 +161,7 @@ def init_cache():
 
 
 def search_tmdb(conn, title, is_series):
+    import httpx
     title_str = str(title)
     title_clean = title_str.lower().strip()
     c = conn.cursor()
@@ -190,6 +190,7 @@ def search_tmdb(conn, title, is_series):
 
 
 def fetch_genres():
+    import httpx
     genre_map = {}
     for endpoint in ['movie', 'tv']:
         try:
