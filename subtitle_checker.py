@@ -100,6 +100,13 @@ def check_subtitles(max_requests: int = 50) -> dict:
         try:
             resp = client.get(url, headers=headers, params={"country": "nl"})
 
+            # Handle rate limiting with backoff
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", "5"))
+                log.warning("  [%d/%d] Rate limited — waiting %ds", i + 1, len(titles), retry_after)
+                time.sleep(retry_after)
+                resp = client.get(url, headers=headers, params={"country": "nl"})
+
             if resp.status_code == 404:
                 # Title not found in the API — mark as checked (no data)
                 update_subtitle_info(conn, tmdb_id, has_english=False, has_italian=False)
@@ -139,8 +146,8 @@ def check_subtitles(max_requests: int = 50) -> dict:
             log.warning("  [%d/%d] %s — error: %s", i + 1, len(titles), title["title"], e)
             stats["errors"] += 1
 
-        # Rate limit
-        time.sleep(0.3)
+        # Rate limit: 1.5s between requests to stay under API limits
+        time.sleep(1.5)
 
         # Commit every 10 titles
         if (i + 1) % 10 == 0:
