@@ -61,12 +61,32 @@ jobs:
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
+
+          # Save freshly-collected data files to a temp location
+          cp -r data/   /tmp/_persist_data
+          cp -r site/data/ /tmp/_persist_site_data
+
+          # Fast-forward to whatever remote main looks like now
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Restore our collected data on top of the latest remote
+          cp -r /tmp/_persist_data/*      data/
+          cp -r /tmp/_persist_site_data/* site/data/
+
           git add data/ site/data/
           git diff --cached --quiet && echo "Nothing to commit" && exit 0
           git commit -m "Auto-update DB: $(date +%F) [skip ci]"
+
           for i in 1 2 3; do
-            git pull --rebase origin main && git push && exit 0
+            git push origin main && exit 0
             echo "Push attempt $i failed, retrying in 5s..."
+            git fetch origin main && git reset --hard origin/main
+            cp -r /tmp/_persist_data/*      data/
+            cp -r /tmp/_persist_site_data/* site/data/
+            git add data/ site/data/
+            git diff --cached --quiet && echo "Nothing to commit" && exit 0
+            git commit -m "Auto-update DB: $(date +%F) [skip ci]"
             sleep 5
           done
           echo "All push attempts failed" && exit 1
