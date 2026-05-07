@@ -2,6 +2,7 @@
 'use strict';
 
 let CATALOG = [];
+let SPOTLIGHT = [];
 let GENRES = [];
 let WATCHLIST = new Set(JSON.parse(localStorage.getItem('pvnl_watchlist') || '[]'));
 
@@ -24,10 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(r => r.json())
         .then(data => {
             CATALOG = data.catalog || [];
+            SPOTLIGHT = data.spotlight || [];
             GENRES = data.genres || [];
             renderStats(data.stats);
             buildGenreMenu();
             renderHero();
+            renderSpotlight();
             renderCuratedSections();
             renderCatalogGrid();
             bindEvents();
@@ -205,6 +208,87 @@ const SIGNAL_TO_GENRE = {
     action: 'Action', romance: 'Romance', horror: 'Horror', scifi: 'Science Fiction',
     animation: 'Animation', documentary: 'Documentary',
 };
+
+// ── Spotlight: Da Vedere (channel-agnostic trending) ──────────
+function _compute_interest_score_client(t) {
+    // Lightweight client-side score for spotlight items
+    const rating = t.rating || 0;
+    const votes = t.votes || 0;
+    const confidence = Math.min(1.0, Math.log10(Math.max(votes, 1)) / 4);
+    return Math.round((rating / 10) * confidence * 60 + (rating >= 7 ? 20 : 0));
+}
+
+function renderSpotlight() {
+    const section = document.getElementById('spotlightSection');
+    const row = document.getElementById('spotlightRow');
+    if (!SPOTLIGHT.length) {
+        section.style.display = 'none';
+        return;
+    }
+
+    // Sort by taste affinity (user's preferences first)
+    const sorted = [...SPOTLIGHT].sort((a, b) => {
+        const scoreA = _compute_interest_score_client(a);
+        const scoreB = _compute_interest_score_client(b);
+        const affinityA = TasteEngine.computeAffinity(a, scoreA);
+        const affinityB = TasteEngine.computeAffinity(b, scoreB);
+        return affinityB - affinityA;
+    });
+
+    row.innerHTML = sorted.map(t => {
+        const rating = t.rating ? `<span class="rating-star">★</span> ${t.rating}` : '';
+        const year = t.date ? t.date.substring(0, 4) : '';
+        const meta = [rating, year].filter(Boolean).join(' · ');
+
+        // Provider availability logos
+        let provLogos = '';
+        if (t.available_on && t.available_on.length) {
+            provLogos = '<div class="spotlight-providers">' +
+                t.available_on.map(p => {
+                    if (p.logo) {
+                        return `<img class="spotlight-prov-logo" src="${p.logo}" alt="${escAttr(p.name)}" title="${escAttr(p.name)}">`;
+                    }
+                    return `<span class="spotlight-prov-badge" title="${escAttr(p.name)}">${escHtml(p.badge || p.name.charAt(0))}</span>`;
+                }).join('') +
+                '</div>';
+        } else {
+            provLogos = '<div class="spotlight-providers"><span class="spotlight-prov-badge spotlight-theater" title="In theaters / not streaming">🎬</span></div>';
+        }
+
+        const img = t.poster
+            ? `<img class="poster-img" src="${t.poster}" alt="${escAttr(t.title)}" loading="lazy">`
+            : `<div class="poster-no-image">${t.type === 'movie' ? '🎬' : '📺'}</div>`;
+
+        return `
+            <div class="poster-card spotlight-card" data-id="${t.id}">
+                ${provLogos}
+                ${img}
+                <div class="poster-info">
+                    <div class="poster-title">${escHtml(t.title)}</div>
+                    <div class="poster-meta">${meta}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Click to open in TMDB (these may not be in our catalog)
+    row.querySelectorAll('.spotlight-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const sid = parseInt(card.dataset.id);
+            const inCatalog = CATALOG.find(c => c.id === sid);
+            if (inCatalog) {
+                openModal(inCatalog);
+            } else {
+                // Open on TMDB for titles not in our catalog
+                const item = SPOTLIGHT.find(s => s.id === sid);
+                const tmdbType = item?.type || 'movie';
+                window.open(`https://www.themoviedb.org/${tmdbType}/${sid}`, '_blank');
+            }
+        });
+    });
+
+    section.style.display = '';
+}
 
 function renderCuratedSections() {
     const taste = TasteEngine.getTasteVector();

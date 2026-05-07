@@ -1,14 +1,25 @@
-"""Export Prime Video NL catalog to JSON for the static site."""
+"""Export NirvanAI catalog to JSON for the static site."""
 from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime
 
-from config import SITE_DATA_DIR, TMDB_IMAGE_BASE
+import httpx
+
+from config import SITE_DATA_DIR, TMDB_IMAGE_BASE, TMDB_API_KEY, TMDB_BASE_URL, WATCH_REGION, LANGUAGE
 from db import init_db, get_all_titles, get_trending, get_new_this_week, get_genres, get_stats
 
 log = logging.getLogger(__name__)
+
+# ── Provider name→badge mapping for spotlight ─────────────────
+PROVIDER_BADGES = {
+    'Netflix': 'N', 'Amazon Prime Video': '▶', 'Apple TV': '',
+    'Disney Plus': 'D+', 'MUBI': 'Ⓜ', 'SkyShowtime': 'Sky',
+    'Viaplay': 'Via', 'Videoland': 'VL', 'HBO Max': 'HBO',
+    'Pathé Thuis': 'PT', 'NPO Start': 'NPO', 'Crunchyroll': 'CR',
+}
 
 
 def _compute_interest_score(title: dict) -> float:
@@ -123,11 +134,16 @@ def export_catalog_json(days_new: int = 7) -> str:
         }
         catalog.append(entry)
 
+    # ── Spotlight: trending this week (channel-agnostic) ──────
+    spotlight = _fetch_spotlight()
+    log.info("Spotlight: %d trending titles with NL availability", len(spotlight))
+
     payload = {
         "generated_at": datetime.utcnow().isoformat(),
         "stats": stats,
         "genres": genres,
         "catalog": catalog,
+        "spotlight": spotlight,
     }
 
     SITE_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -139,6 +155,88 @@ def export_catalog_json(days_new: int = 7) -> str:
              len(catalog), out_path, out_path.stat().st_size / 1024)
     conn.close()
     return str(out_path)
+
+
+def _fetch_spotlight(max_items: int = 30) -> list[dict]:
+    """Fetch trending titles this week with NL watch provider availability.
+
+    This is channel-agnostic — shows what's hot regardless of platform.
+    """
+    client = httpx.Client(timeout=15)
+    params = {"api_key": TMDB_API_KEY, "language": LANGUAGE}
+    spotlight = []
+    seen_ids = set()
+
+    # Resolve genre_ids → genre names so TasteEngine can rank
+    genre_map = {}
+    for mt in ("movie", "tv"):
+        try:
+            gr = client.get(f"{TMDB_BASE_URL}/genre/{mt}/list", params=params)
+            gr.raise_for_status()
+            for g in gr.json().get("genres", []):
+                genre_map[g["id"]] = g["name"]
+        except httpx.HTTPError:
+            pass
+
+    for media_type in ("movie", "tv"):
+        try:
+            resp = client.get(
+                f"{TMDB_BASE_URL}/trending/{media_type}/week", params=params
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+        except httpx.HTTPError as e:
+            log.warning("Spotlight fetch failed for %s: %s", media_type, e)
+            continue
+
+        for item in results:
+            tmdb_id = item["id"]
+            if tmdb_id in seen_ids:
+                continue
+            seen_ids.add(tmdb_id)
+
+            # Fetch NL watch providers
+            available_on = []
+            try:
+                wp_resp = client.get(
+                    f"{TMDB_BASE_URL}/{media_type}/{tmdb_id}/watch/providers",
+                    params={"api_key": TMDB_API_KEY},
+                )
+                wp_resp.raise_for_status()
+                nl_data = wp_resp.json().get("results", {}).get("NL", {})
+                for prov in nl_data.get("flatrate", []):
+                    name = prov.get("provider_name", "")
+                    available_on.append({
+                        "name": name,
+                        "badge": PROVIDER_BADGES.get(name, ""),
+                        "logo": f"{TMDB_IMAGE_BASE}/w45{prov['logo_path']}" if prov.get("logo_path") else None,
+                    })
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.1)
+
+            title_key = "title" if media_type == "movie" else "name"
+            date_key = "release_date" if media_type == "movie" else "first_air_date"
+
+            spotlight.append({
+                "id": tmdb_id,
+                "type": media_type,
+                "title": item.get(title_key, ""),
+                "overview": (item.get("overview", "") or "")[:200],
+                "genres": [genre_map.get(gid, "") for gid in item.get("genre_ids", []) if gid in genre_map],
+                "rating": round(item.get("vote_average", 0), 1),
+                "votes": item.get("vote_count", 0),
+                "popularity": round(item.get("popularity", 0), 1),
+                "date": item.get(date_key, ""),
+                "poster": f"{TMDB_IMAGE_BASE}/w500{item['poster_path']}" if item.get("poster_path") else None,
+                "backdrop": f"{TMDB_IMAGE_BASE}/w780{item['backdrop_path']}" if item.get("backdrop_path") else None,
+                "available_on": available_on,
+            })
+
+    client.close()
+    # Sort by rating descending, cap at max_items
+    spotlight.sort(key=lambda x: x.get("rating", 0), reverse=True)
+    return spotlight[:max_items]
 
 
 if __name__ == "__main__":
