@@ -1,12 +1,12 @@
 {
   "signals": {
-    "action": 0.1924,
-    "mainstream": 0.363,
-    "crime": 0.2412,
-    "thriller": 0.3749,
-    "drama": 0.9973,
-    "scifi": 0.4532,
-    "visual": 0.4893,
+    "action": 0.1962,
+    "mainstream": 0.3666,
+    "crime": 0.2413,
+    "thriller": 0.3757,
+    "drama": 0.9946,
+    "scifi": 0.455,
+    "visual": 0.4902,
     "comedy": 0.8423,
     "romance": 0.2087,
     "arthouse": 0.2975,
@@ -17,13 +17,13 @@
     "animation": 0.3083,
     "intense": 0.058,
     "documentary": 0.0216,
-    "indie": 0.0975,
+    "indie": 0.0984,
     "surreal": 0.0209,
     "social": 0.0255
   },
-  "totalRatings": 895,
+  "totalRatings": 900,
   "tmdbRatings": 5,
-  "lastSync": "2026-05-07T08:03:48.701381",
+  "lastSync": "2026-05-07T08:07:17.331141",
   "ratedTitles": [
     {
       "id": 502033,
