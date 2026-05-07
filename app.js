@@ -6,6 +6,29 @@ let SPOTLIGHT = [];
 let GENRES = [];
 let WATCHLIST = new Set(JSON.parse(localStorage.getItem('pvnl_watchlist') || '[]'));
 
+// ── TMDB API (for pushing user ratings) ───────────────────────
+const TMDB_API_KEY = '8906d69b5882c693d04af4c7c8282fc9';
+const TMDB_SESSION_ID = 'db41ced2650c70a843231898f18850fe4f9daca0';
+
+function pushRatingToTMDB(title, score) {
+    const mediaType = title.type === 'tv' ? 'tv' : 'movie';
+    const url = `https://api.themoviedb.org/3/${mediaType}/${title.id}/rating?api_key=${TMDB_API_KEY}&session_id=${TMDB_SESSION_ID}`;
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json;charset=utf-8' },
+        body: JSON.stringify({ value: score }),  // TMDB accepts 0.5-10
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            console.log(`✅ TMDB rating pushed: ${title.title} → ${score}/10`);
+        } else {
+            console.warn('TMDB rating failed:', data);
+        }
+    })
+    .catch(err => console.warn('TMDB rating error:', err));
+}
+
 // ── State ─────────────────────────────────────────────────────
 let state = {
     typeFilter: 'all',      // all | movie | tv
@@ -668,6 +691,7 @@ function openModal(t) {
         dot.addEventListener('click', (e) => {
             const score = parseInt(e.currentTarget.dataset.score);
             TasteEngine.processRating(t.id, score, t);
+            pushRatingToTMDB(t, score);
             // Update visual
             content.querySelectorAll('.modal-rating-dot').forEach(d => {
                 const s = parseInt(d.dataset.score);
