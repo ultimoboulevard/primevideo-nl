@@ -472,6 +472,43 @@ a:hover { text-decoration: underline; }
     letter-spacing: 1px;
 }
 
+/* Spotlight provider logos */
+.spotlight-providers {
+    position: absolute;
+    bottom: 46px;
+    left: 6px;
+    display: flex;
+    gap: 3px;
+    z-index: 3;
+}
+
+.spotlight-prov-logo {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    object-fit: cover;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.spotlight-prov-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.spotlight-theater {
+    background: rgba(80,60,20,0.8);
+}
+
 .poster-watchlist {
     position: absolute;
     top: 8px;
