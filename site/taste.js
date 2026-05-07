@@ -350,6 +350,15 @@ const TasteEngine = (() => {
             affinityBoost /= matchedSignals;
         }
 
+        // Phase 3: Auteur director boost (0 to +8)
+        // Scales with user's arthouse+visual affinity — mainstream users get minimal boost
+        if (title.auteur) {
+            const artAffinity = Math.max(0, taste.signals.arthouse || 0);
+            const visAffinity = Math.max(0, taste.signals.visual || 0);
+            const auteurBoost = Math.min(8, (artAffinity + visAffinity) * 7.5);
+            affinityBoost += auteurBoost;
+        }
+
         // Already rated? Penalize slightly (seen it)
         if (ratings[title.id]) {
             affinityBoost -= 5;

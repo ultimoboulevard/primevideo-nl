@@ -10,6 +10,7 @@ import httpx
 
 from config import SITE_DATA_DIR, TMDB_IMAGE_BASE, TMDB_API_KEY, TMDB_BASE_URL, WATCH_REGION, LANGUAGE
 from db import init_db, get_all_titles, get_trending, get_new_this_week, get_genres, get_stats
+from import_taste_history import AUTEUR_MAP
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +80,14 @@ def _compute_interest_score(title: dict) -> float:
     total = vote_score + gem_score + recency_score + meta_score
     return round(min(100, max(0, total)), 1)
 
+
+def _is_auteur_director(director_name: str | None) -> bool:
+    """Check if a director matches any key in the AUTEUR_MAP."""
+    if not director_name:
+        return False
+    d = director_name.lower()
+    return any(key in d for key in AUTEUR_MAP)
+
 def export_catalog_json(days_new: int = 7) -> str:
     """Export the full catalog to a JSON file for the static site."""
     conn = init_db()
@@ -127,6 +136,7 @@ def export_catalog_json(days_new: int = 7) -> str:
             "trailer_key": t.get("trailer_key"),
             "cast": t.get("cast_names", []),
             "director": t.get("director"),
+            "auteur": _is_auteur_director(t.get("director")),
             "trending": t["tmdb_id"] in trending_ids,
             "new": t["tmdb_id"] in new_ids,
             "first_seen": t.get("first_seen", ""),
