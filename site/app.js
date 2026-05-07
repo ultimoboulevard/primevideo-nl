@@ -980,19 +980,124 @@ function updateTasteIndicator() {
             label.textContent = `${ratings} rated`;
         }
 
-        indicator.onclick = () => {
-            // Toggle For You sort
-            state.sortBy = state.sortBy === 'foryou' ? 'popularity' : 'foryou';
-            state.gridPage = 0;
-            const labels = { popularity: 'Popular', foryou: '✨ For You', rating: 'Top Rated', newest: 'Newest', az: 'A → Z' };
-            document.getElementById('sortBtn').textContent = `Sort: ${labels[state.sortBy]} ▾`;
-            document.querySelectorAll('#sortMenu .dropdown-item').forEach(b => {
-                b.classList.toggle('active', b.dataset.sort === state.sortBy);
-            });
-            renderCatalogGrid();
-            OnboardingQuiz.showToast(
-                state.sortBy === 'foryou' ? 'Sorted by your taste' : 'Sorted by popularity'
-            );
+        indicator.onclick = (e) => {
+            e.stopPropagation();
+            toggleTastePanel();
         };
     }
+}
+
+// ── Taste Profile Panel ──────────────────────────────────────
+function toggleTastePanel() {
+    let panel = document.getElementById('tastePanel');
+    if (panel) {
+        // Already open → close it
+        panel.classList.remove('visible');
+        setTimeout(() => panel.remove(), 300);
+        return;
+    }
+
+    const taste = TasteEngine.getTasteVector();
+    const signals = Object.entries(taste.signals || {})
+        .filter(([_, v]) => v > 0.01)
+        .sort(([, a], [, b]) => b - a);
+
+    const maxVal = signals.length ? signals[0][1] : 1;
+
+    // Signal display names
+    const SIGNAL_NAMES = {
+        drama: 'Drama', comedy: 'Comedy', thriller: 'Thriller', crime: 'Crime',
+        action: 'Action', romance: 'Romance', horror: 'Horror', scifi: 'Sci-Fi',
+        animation: 'Animation', documentary: 'Documentary', arthouse: 'Arthouse',
+        mainstream: 'Mainstream', international: 'International', european: 'European',
+        indie: 'Indie', visual: 'Visual', auteur: 'Auteur', classic: 'Classic',
+        social: 'Social', intense: 'Intense', surreal: 'Surreal',
+        adventure: 'Adventure', fantasy: 'Fantasy',
+    };
+
+    // Build signal bars
+    const barsHtml = signals.map(([key, val]) => {
+        const pct = Math.round((val / maxVal) * 100);
+        const displayPct = Math.round(val * 100);
+        const name = SIGNAL_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1);
+        // Color gradient: top signals get accent-primary, lower ones get muted
+        const hue = val > 0.5 ? 165 : val > 0.2 ? 260 : 220;
+        const sat = Math.round(40 + val * 60);
+        const light = Math.round(40 + val * 20);
+        return `
+            <div class="tp-signal-row">
+                <span class="tp-signal-name">${name}</span>
+                <div class="tp-signal-track">
+                    <div class="tp-signal-fill" style="width:${pct}%;background:hsl(${hue},${sat}%,${light}%)"></div>
+                </div>
+                <span class="tp-signal-value">${displayPct}%</span>
+            </div>
+        `;
+    }).join('');
+
+    // Decade preferences
+    const decades = Object.entries(taste.decades || {})
+        .filter(([_, v]) => v > 0.01)
+        .sort(([, a], [, b]) => b - a);
+    const decadeMax = decades.length ? decades[0][1] : 1;
+    const decadesHtml = decades.length ? `
+        <div class="tp-section-title">📅 Decade Affinity</div>
+        ${decades.map(([dec, val]) => {
+            const pct = Math.round((val / decadeMax) * 100);
+            return `
+                <div class="tp-signal-row">
+                    <span class="tp-signal-name">${dec}</span>
+                    <div class="tp-signal-track">
+                        <div class="tp-signal-fill tp-decade-fill" style="width:${pct}%"></div>
+                    </div>
+                    <span class="tp-signal-value">${Math.round(val * 100)}%</span>
+                </div>
+            `;
+        }).join('')}
+    ` : '';
+
+    // Adventurousness gauge
+    const adv = Math.round((taste.adventurousness || 0) * 100);
+    const advLabel = adv >= 70 ? 'Explorer' : adv >= 40 ? 'Balanced' : 'Mainstream';
+
+    // Last sync info
+    const lastSync = taste.lastUpdated || taste.lastSync;
+    const syncText = lastSync ? new Date(lastSync).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+    panel = document.createElement('div');
+    panel.id = 'tastePanel';
+    panel.className = 'taste-panel';
+    panel.innerHTML = `
+        <div class="tp-header">
+            <div class="tp-title">🧠 Taste DNA</div>
+            <div class="tp-stats">
+                <span class="tp-stat">${taste.totalRatings || 0} titles</span>
+                <span class="tp-stat-sep">·</span>
+                <span class="tp-stat">${advLabel} (${adv}%)</span>
+                <span class="tp-stat-sep">·</span>
+                <span class="tp-stat">Synced ${syncText}</span>
+            </div>
+        </div>
+        <div class="tp-body">
+            <div class="tp-section-title">🎯 Signal Weights</div>
+            ${barsHtml}
+            ${decadesHtml}
+        </div>
+    `;
+
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    document.body.appendChild(panel);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => panel.classList.add('visible'));
+    });
+
+    // Click outside to close
+    const closeHandler = () => {
+        panel.classList.remove('visible');
+        setTimeout(() => panel.remove(), 300);
+        document.removeEventListener('click', closeHandler);
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
