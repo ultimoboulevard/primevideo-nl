@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI entrypoint for Prime Video NL pipeline."""
+"""CLI entrypoint for NirvanAI pipeline."""
 from __future__ import annotations
 
 import argparse
@@ -17,8 +17,23 @@ def cmd_collect(args):
     print(f"Collection complete: {stats}")
 
 
+def cmd_taste_sync(args):
+    """Sync taste profile from TMDB user ratings."""
+    from taste_sync import sync_taste
+    result = sync_taste()
+    print(f"Taste sync: {result['tmdbRatings']} TMDB ratings, "
+          f"{result['totalRatings']} total, "
+          f"{len(result['signals'])} signals")
+
+
 def cmd_export(args):
-    """Export database to JSON for static site."""
+    """Sync taste + export database to JSON for static site."""
+    # Auto-sync taste profile before exporting
+    from taste_sync import sync_taste
+    try:
+        sync_taste()
+    except Exception as e:
+        logging.getLogger(__name__).warning("Taste sync failed (non-fatal): %s", e)
     from export_json import export_catalog_json
     path = export_catalog_json()
     print(f"Exported to {path}")
@@ -74,11 +89,12 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    parser = argparse.ArgumentParser(description="Prime Video NL Pipeline")
+    parser = argparse.ArgumentParser(description="NirvanAI Pipeline")
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("collect", help="Fetch from TMDB API")
-    sub.add_parser("export", help="Export DB to JSON")
+    sub.add_parser("export", help="Sync taste + export DB to JSON")
+    sub.add_parser("taste-sync", help="Sync taste profile from TMDB ratings")
 
     p_digest = sub.add_parser("digest", help="Generate HTML digest")
     p_digest.add_argument("--days", type=int, default=7)
@@ -96,6 +112,7 @@ def main():
     {
         "collect": cmd_collect,
         "export": cmd_export,
+        "taste-sync": cmd_taste_sync,
         "digest": cmd_digest,
         "send": cmd_send,
         "site": cmd_site,

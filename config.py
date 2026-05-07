@@ -16,6 +16,10 @@ TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "8906d69b5882c693d04af4c7c8282fc9"
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 
+# TMDB user account (for syncing personal ratings)
+TMDB_ACCOUNT_ID = 23099399
+TMDB_SESSION_ID = os.environ.get("TMDB_SESSION_ID", "db41ced2650c70a843231898f18850fe4f9daca0")
+
 # Prime Video NL = provider_id 119, MUBI NL = provider_id 11 on TMDB
 PRIME_PROVIDER_ID = 119
 PROVIDERS = {
