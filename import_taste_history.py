@@ -13,7 +13,7 @@ v2: Added director-based auteur layer — no extra API calls needed,
 
 import json
 import sqlite3
-import requests
+import httpx
 import time
 import os
 from collections import defaultdict
@@ -175,7 +175,7 @@ def search_tmdb(conn, title, is_series):
     params = {'api_key': TMDB_API_KEY, 'query': title_str, 'language': 'en-US', 'page': 1}
 
     try:
-        resp = requests.get(url, params=params, timeout=5)
+        resp = httpx.get(url, params=params, timeout=5.0)
         resp.raise_for_status()
         results = resp.json().get('results', [])
         best_match = results[0] if results else None
@@ -193,9 +193,9 @@ def fetch_genres():
     genre_map = {}
     for endpoint in ['movie', 'tv']:
         try:
-            resp = requests.get(
+            resp = httpx.get(
                 f"https://api.themoviedb.org/3/genre/{endpoint}/list",
-                params={'api_key': TMDB_API_KEY}, timeout=5
+                params={'api_key': TMDB_API_KEY}, timeout=5.0
             )
             for g in resp.json().get('genres', []):
                 genre_map[g['id']] = g['name']
