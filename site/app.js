@@ -677,7 +677,7 @@ function openModal(t) {
         </div>
     `;
 
-    // Subtitle info
+    // Subtitle info — only show when we have real data
     let subsHtml = '';
     if (t.engSubs !== null && t.engSubs !== undefined) {
         const enClass = t.engSubs ? 'available' : 'unavailable';
@@ -691,14 +691,8 @@ function openModal(t) {
                 <span class="modal-subs-tag ${itClass}">🇮🇹 Italian ${itIcon}</span>
             </div>
         `;
-    } else {
-        subsHtml = `
-            <div class="modal-subs">
-                <span class="modal-subs-label">Subtitles</span>
-                <span class="modal-subs-tag unknown">Not yet verified</span>
-            </div>
-        `;
     }
+    // null = not yet checked → hide section entirely
 
     content.innerHTML = `
         <h2 class="modal-title">${escHtml(t.title)}</h2>
