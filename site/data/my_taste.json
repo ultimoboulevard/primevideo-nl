@@ -1,32 +1,53 @@
 {
   "signals": {
-    "action": 0.1886,
-    "mainstream": 0.3594,
-    "crime": 0.2411,
-    "thriller": 0.374,
+    "action": 0.2468,
+    "mainstream": 0.3823,
+    "crime": 0.3072,
+    "thriller": 0.4062,
     "drama": 1.0,
-    "scifi": 0.8118,
-    "visual": 0.4884,
-    "comedy": 0.8423,
-    "romance": 0.2087,
-    "arthouse": 0.2975,
-    "international": 0.0255,
-    "horror": 0.1839,
-    "european": 0.1808,
-    "classic": 0.0819,
-    "animation": 0.3083,
-    "intense": 0.058,
-    "documentary": 0.0216,
-    "indie": 0.0966,
-    "surreal": 0.0209,
-    "social": 0.0255,
-    "adventure": 0.657,
-    "fantasy": 0.657
+    "scifi": 0.9237,
+    "visual": 0.5196,
+    "comedy": 0.8961,
+    "romance": 0.222,
+    "arthouse": 0.3165,
+    "international": 0.0271,
+    "horror": 0.1956,
+    "european": 0.1923,
+    "classic": 0.0871,
+    "animation": 0.328,
+    "intense": 0.0617,
+    "documentary": 0.023,
+    "indie": 0.1028,
+    "surreal": 0.0222,
+    "social": 0.0271,
+    "adventure": 0.8084,
+    "fantasy": 0.5531,
+    "music": 0.1277
   },
-  "totalRatings": 893,
-  "tmdbRatings": 1,
-  "lastSync": "2026-05-07T07:34:46.001887",
+  "totalRatings": 898,
+  "tmdbRatings": 5,
+  "lastSync": "2026-05-07T07:38:15.435129",
   "ratedTitles": [
+    {
+      "id": 502033,
+      "rating": 6.0,
+      "title": "Sound of Metal"
+    },
+    {
+      "id": 438631,
+      "rating": 7.0,
+      "title": "Dune"
+    },
+    {
+      "id": 475557,
+      "rating": 6.0,
+      "title": "Joker"
+    },
+    {
+      "id": 399566,
+      "rating": 5.0,
+      "title": "Godzilla vs. Kong"
+    },
     {
       "id": 83533,
       "rating": 3.0,
