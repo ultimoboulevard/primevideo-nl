@@ -10,7 +10,7 @@ v2: Added director-based auteur layer — no extra API calls needed,
     director is read directly from the Excel's column 7.
 """
 
-import openpyxl
+
 import json
 import sqlite3
 import requests
@@ -224,6 +224,7 @@ def clamp(val, min_val, max_val):
 
 
 def main():
+    import openpyxl
     print(f"Reading {EXCEL_PATH}...")
     try:
         wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
