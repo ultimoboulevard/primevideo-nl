@@ -511,6 +511,43 @@
     50% { opacity: 0.4; }
 }
 
+/* ── Refresh / Aggiorna button ──────────────────────────────── */
+.refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(124, 92, 252, 0.08);
+    border: 1px solid rgba(124, 92, 252, 0.18);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-secondary, #7c5cfc);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.refresh-btn svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.refresh-btn:hover {
+    background: rgba(124, 92, 252, 0.18);
+    border-color: rgba(124, 92, 252, 0.4);
+    color: #a07fff;
+    box-shadow: 0 0 14px rgba(124, 92, 252, 0.2);
+}
+
+.refresh-btn:hover svg {
+    transform: rotate(360deg);
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    TASTE DNA PANEL (read-only weights view)
