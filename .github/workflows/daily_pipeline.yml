@@ -56,7 +56,16 @@ jobs:
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
         run: python main.py digest
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
 
       - name: Persist DB
         run: |
