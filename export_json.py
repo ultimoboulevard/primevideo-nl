@@ -306,9 +306,11 @@ def _fetch_spotlight(max_items: int = 30) -> list[dict]:
     random.seed(day_seed)
     random.shuffle(spotlight)
 
-    # Sort by rating (within the shuffled pool, top-rated bubble up)
-    spotlight.sort(key=lambda x: x.get("rating", 0), reverse=True)
-    return spotlight[:max_items]
+    # Select the daily subset FIRST, then sort it by rating so the best of today's slice bubble up
+    daily_selection = spotlight[:max_items]
+    daily_selection.sort(key=lambda x: x.get("rating", 0), reverse=True)
+    
+    return daily_selection
 
 
 if __name__ == "__main__":
