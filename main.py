@@ -29,7 +29,8 @@ def cmd_taste_sync(args):
 def cmd_subs(args):
     """Check subtitle availability on Prime Video NL."""
     from subtitle_checker import check_subtitles
-    max_req = getattr(args, "max_requests", 50)
+    from config import SUBS_MAX_REQUESTS_PER_RUN
+    max_req = getattr(args, "max_requests", None) or SUBS_MAX_REQUESTS_PER_RUN
     stats = check_subtitles(max_requests=max_req)
     print(f"Subtitle check: {stats}")
 
@@ -44,8 +45,9 @@ def cmd_export(args):
         logging.getLogger(__name__).warning("Taste sync failed (non-fatal): %s", e)
     # Check subtitles for unchecked titles
     from subtitle_checker import check_subtitles
+    from config import SUBS_MAX_REQUESTS_PER_RUN
     try:
-        check_subtitles(max_requests=50)
+        check_subtitles(max_requests=SUBS_MAX_REQUESTS_PER_RUN)
     except Exception as e:
         logging.getLogger(__name__).warning("Subtitle check failed (non-fatal): %s", e)
     from export_json import export_catalog_json
@@ -111,7 +113,7 @@ def main():
     sub.add_parser("taste-sync", help="Sync taste profile from TMDB ratings")
 
     p_subs = sub.add_parser("subs", help="Check subtitle availability on Prime Video NL")
-    p_subs.add_argument("--max-requests", type=int, default=50)
+    p_subs.add_argument("--max-requests", type=int, default=None)
 
     p_digest = sub.add_parser("digest", help="Generate HTML digest")
     p_digest.add_argument("--days", type=int, default=7)

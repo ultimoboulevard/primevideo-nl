@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from config import STREAMING_API_KEY, STREAMING_API_BASE
+from config import STREAMING_API_KEY, STREAMING_API_BASE, SUBS_MAX_REQUESTS_PER_RUN
 from db import init_db, get_titles_needing_sub_check, update_subtitle_info
 
 log = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def _extract_prime_subs(data: dict) -> tuple[bool | None, bool | None]:
     return has_english, has_italian
 
 
-def check_subtitles(max_requests: int = 50) -> dict:
+def check_subtitles(max_requests: int = SUBS_MAX_REQUESTS_PER_RUN) -> dict:
     """Check subtitle availability for titles that need verification.
 
     Returns stats dict with counts.
@@ -187,7 +187,7 @@ def check_subtitles(max_requests: int = 50) -> dict:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     parser = argparse.ArgumentParser(description="Check subtitle availability on Prime Video NL")
-    parser.add_argument("--max-requests", type=int, default=50, help="Max API requests per run")
+    parser.add_argument("--max-requests", type=int, default=SUBS_MAX_REQUESTS_PER_RUN, help="Max API requests per run")
     args = parser.parse_args()
     result = check_subtitles(max_requests=args.max_requests)
     print(f"Done: {result}")
