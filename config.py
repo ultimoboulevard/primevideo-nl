@@ -37,9 +37,10 @@ EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
 EMAIL_RECIPIENT = "francescozaccaria@me.com"
 
 # ── Streaming Availability API (subtitle check) ───────────────
-# Free plan ≈ 1000 requests/month: 15/day stays under the 50% alert.
+# Free plan ≈ 1000 requests/month; the pipeline runs weekly, so 100/run
+# (≈430/month) stays under the 50% alert.
 STREAMING_API_KEY = os.environ.get("STREAMING_API_KEY", "")
-SUBS_MAX_REQUESTS_PER_RUN = 15
+SUBS_MAX_REQUESTS_PER_RUN = 100
 STREAMING_API_BASE = "https://api.movieofthenight.com/v4"
 
 # ── Site ───────────────────────────────────────────────────────

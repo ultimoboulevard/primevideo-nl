@@ -2,8 +2,8 @@ name: Prime Video NL Pipeline
 
 on:
   schedule:
-    # Every day at 05:00 UTC = 07:00 CEST (Amsterdam summer)
-    - cron: '0 5 * * *'
+    # Weekly, Monday 05:00 UTC = 07:00 CEST (Amsterdam summer) — the digest is Monday-only
+    - cron: '0 5 * * 1'
   push:
     branches: [main]
     paths:
